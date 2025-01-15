@@ -22,6 +22,7 @@ type Challenge struct {
     Visible      bool     `yaml:"visible,omitempty"`
     Tags         []string `yaml:"tags"`
     Links        []string `yaml:"links"`
+	ChallDir     string
 }
 
 type Hint struct {
@@ -69,6 +70,7 @@ func GetChalls(path string) []Challenge {
 
 	if isValidChallDir(path) {
 		chall := parseChallFile(filepath.Join(path, "chall.yaml"))
+		chall.ChallDir = path
 		challs = append(challs, chall)
 	} else {
 		all_chall_dirs, err := os.ReadDir(path)
@@ -82,6 +84,7 @@ func GetChalls(path string) []Challenge {
 				full_chall_dir := filepath.Join(path, chall_dir.Name())
 				if isValidChallDir(full_chall_dir) {
 					chall := parseChallFile(filepath.Join(full_chall_dir, "chall.yaml"))
+					chall.ChallDir = full_chall_dir
 					challs = append(challs, chall)
 				}
 			}

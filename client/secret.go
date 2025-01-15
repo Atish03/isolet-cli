@@ -6,7 +6,6 @@ import (
 )
 
 func (client CustomClient) GetDockerConfig(namespace string, name string) (configjson string, err error) {
-	
 	item, err := client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
