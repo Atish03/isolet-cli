@@ -71,7 +71,12 @@ func GetChalls(path string) []Challenge {
 	if isValidChallDir(path) {
 		chall := parseChallFile(filepath.Join(path, "chall.yaml"))
 		chall.ChallDir = path
-		challs = append(challs, chall)
+		err := chall.Validate()
+		if err != nil {
+			fmt.Printf("error in challenge format: %v", err)
+		} else {
+			challs = append(challs, chall)
+		}
 	} else {
 		all_chall_dirs, err := os.ReadDir(path)
 		if err != nil {
@@ -85,11 +90,41 @@ func GetChalls(path string) []Challenge {
 				if isValidChallDir(full_chall_dir) {
 					chall := parseChallFile(filepath.Join(full_chall_dir, "chall.yaml"))
 					chall.ChallDir = full_chall_dir
-					challs = append(challs, chall)
+					err := chall.Validate()
+					if err != nil {
+						fmt.Printf("error in challenge format: %s", err)
+					} else {
+						challs = append(challs, chall)
+					}
 				}
 			}
 		}
 	}
 
 	return challs
+}
+
+func (c *Challenge) Validate() error {
+	if c.ChallName == "" {
+		return fmt.Errorf("chall_name is required")
+	}
+	if c.Type == "" {
+		return fmt.Errorf("type is required")
+	}
+	if c.CategoryName == "" {
+		return fmt.Errorf("category_name is required")
+	}
+	if c.Prompt == "" {
+		return fmt.Errorf("prompt is required")
+	}
+	if c.Points == 0 {
+		return fmt.Errorf("points is required")
+	}
+	if c.Flag == "" {
+		return fmt.Errorf("flag is required")
+	}
+	if c.Author == "" {
+		return fmt.Errorf("author is required")
+	}
+	return nil
 }
