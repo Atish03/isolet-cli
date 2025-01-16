@@ -1,1 +1,3 @@
 test/
+job-image/__pycache__
+job-image/automation-job
