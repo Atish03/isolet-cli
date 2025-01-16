@@ -1,9 +1,13 @@
 package client
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	"flag"
 	"path/filepath"
@@ -11,6 +15,7 @@ import (
 
 type CustomClient struct {
 	*kubernetes.Clientset
+	Config *rest.Config
 }
 
 func GetClient() (clientset CustomClient) {
@@ -27,9 +32,13 @@ func GetClient() (clientset CustomClient) {
 		panic(err.Error())
 	}
 
+	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+	config.APIPath = "/api"
+	config.NegotiatedSerializer = serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
+
 	client, err := kubernetes.NewForConfig(config)
 	
-	clientset = CustomClient{client}
+	clientset = CustomClient{client, config}
 	if err != nil {
 		panic(err.Error())
 	}
