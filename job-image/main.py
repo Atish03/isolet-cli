@@ -22,6 +22,7 @@ if __name__ == "__main__":
     wait_until_copying(source_dir, lock_file)
 
     print("Starting process...")
-    kcli = kubernetes_client.KubeClient()
-    print(kcli.get_registry_auth("https://index.docker.io/v1/"))
+    # kcli = kubernetes_client.KubeClient()
+    # print(kcli.get_registry_auth("https://index.docker.io/v1/"))
+    print(os.environ)
     print("Done!")
