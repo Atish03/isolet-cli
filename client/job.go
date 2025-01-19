@@ -17,7 +17,7 @@ import (
 	"github.com/Atish03/isolet-cli/cp"
 )
 
-func (clientset *CustomClient) StartJob(namespace, jobName, image string, command *[]string, args *[]string) (*batchv1.Job, error) {
+func (clientset *CustomClient) StartJob(namespace, jobName, image string, export *string, challType string, command *[]string, args *[]string) (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: jobName,
@@ -36,6 +36,16 @@ func (clientset *CustomClient) StartJob(namespace, jobName, image string, comman
 							Image:   image,
 							Command: *command,
 							Args:    *args,
+							Env: 	 []corev1.EnvVar{
+								{
+									Name: "CHALL_EXPORT",
+									Value: *export,
+								},
+								{
+									Name: "CHALL_TYPE",
+									Value: challType,
+								},
+							},	
 						},
 					},
 				},
@@ -80,7 +90,7 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) error {
 	}
 }
 
-func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest string) {
+func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest string) error {
 	labelSelector := fmt.Sprintf("job=%s", jobName)
 
 	for {
@@ -88,8 +98,7 @@ func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest s
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
-			fmt.Printf("cannot get list of pods for job %s: %v", jobName, err)
-			return
+			return fmt.Errorf("cannot get list of pods for job %s: %v", jobName, err)
 		}
 		if len(podList.Items) != 0 {
 			for _, pod := range(podList.Items) {
@@ -103,10 +112,9 @@ func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest s
 				
 				err = clientset.getPodLog(namespace, pod.Name)
 				if err != nil {
-					fmt.Printf("error streaming logs for pod %s: %v", pod.Name, err)
-					return
+					return fmt.Errorf("error streaming logs for pod %s: %v", pod.Name, err)
 				}
-				return
+				return nil
 			}
 		}
 		time.Sleep(2 * time.Second)
