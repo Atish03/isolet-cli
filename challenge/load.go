@@ -3,61 +3,34 @@ package challenge
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/Atish03/isolet-cli/client"
-	"github.com/Atish03/isolet-cli/random_string"
 )
 
-func (chall *Challenge) Load(cli *client.CustomClient, namespace string, waitgroup *sync.WaitGroup) {
-	err := func(cli *client.CustomClient, namespace string) error {
-		switch chall.Type {
-		case "dynamic":
-			return chall.dynLoad(cli, namespace)
-		case "on-demand":
-			return chall.ondemLoad(cli)
-		case "static":
-			return chall.statLoad(cli)
-		default:
-			return fmt.Errorf("invalid challenge type")
-		}
-	}(cli, namespace)
-
-	if err != nil {
-		fmt.Printf("cannot load challenge %s: %v", chall.ChallDir, err)
-	}
-
-	defer waitgroup.Done()
-}
-
-func (chall *Challenge) dynLoad(cli *client.CustomClient, namespace string) error {
-	fmt.Println("Loading dynamic chall")
+func (chall *Challenge) Load(cli *client.CustomClient, namespace string, export *string, waitgroup *sync.WaitGroup) {
 	command := []string{"python", "-u", "main.py"}
 	args := []string{}
+	defer waitgroup.Done()
 
-	job_name := fmt.Sprintf("%s-%s", filepath.Base(filepath.Clean(chall.ChallDir)), random_string.AlphaStringLower(5))
+	job_name := strings.ReplaceAll(strings.ToLower(filepath.Base(filepath.Clean(chall.ChallDir))), "_", "-")
 
-	job, err := cli.StartJob(namespace, job_name, "b3gul4/isolet-automation-chall:latest", &command, &args)
+	job, err := cli.StartJob(namespace, job_name, "b3gul4/isolet-automation-chall:latest", export, chall.Type, &command, &args)
 	if err != nil {
-		return fmt.Errorf("cannot start job: %v", err)
+		fmt.Printf("cannot start job: %v", err)
+		return
 	}
 
-	cli.CopyAndStreamLogs(namespace, job.Name, fmt.Sprintf("%s/", chall.ChallDir), "/chall")
+	err = cli.CopyAndStreamLogs(namespace, job.Name, fmt.Sprintf("%s/", chall.ChallDir), "/chall")
+	if err != nil {
+		fmt.Printf("error while streaming logs: %v", err)
+		return
+	}
 
 	err = cli.DeleteJob(namespace, job.Name)
 	if err != nil {
-		return fmt.Errorf("cannot delete job: %v", err)
+		fmt.Printf("cannot delete job: %v", err)
+		return
 	}
-
-	return nil
-}
-
-func (chall *Challenge) ondemLoad(cli *client.CustomClient) error {
-	fmt.Println("Loading on-demand chall")
-	return nil
-}
-
-func (chall *Challenge) statLoad(cli *client.CustomClient) error {
-	fmt.Println("Loading static chall")
-	return nil
 }
