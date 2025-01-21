@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Atish03/isolet-cli/logger"
 	"gopkg.in/yaml.v2"
 )
 
@@ -37,24 +38,21 @@ type ExportStruct struct {
 	HintsQuery string `json:"hints_query"`
 }
 
-func parseChallFile(filename string) Challenge {
+func parseChallFile(filename string) (chall Challenge) {
 	file, err := os.Open(filename)
 	if err != nil {
-		fmt.Println("Unable to read file chall.yaml")
-		os.Exit(1)
+		logger.LogMessage("ERROR", "unable to read file chall.yaml", "Parser")
+		return
 	}
 	defer file.Close()
 
-	var chall Challenge
 	decoder := yaml.NewDecoder(file)
 	err = decoder.Decode(&chall)
 	if err != nil {
-		fmt.Println("Cannot parse the yaml file:", filename)
-		fmt.Println(err.Error())
-		os.Exit(1)
+		logger.LogMessage("ERROR", fmt.Sprintf("cannot decode yaml: %v", err), "Parser")
 	}
 
-	return chall
+	return
 }
 
 func isValidChallDir(path string) bool {
@@ -80,14 +78,14 @@ func GetChalls(path string) []Challenge {
 		chall.ChallDir = path
 		err := chall.validate()
 		if err != nil {
-			fmt.Printf("error in challenge format: %v", err)
+			logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
 		} else {
 			challs = append(challs, chall)
 		}
 	} else {
 		all_chall_dirs, err := os.ReadDir(path)
 		if err != nil {
-			fmt.Println("Cannot read the specified directory")
+			logger.LogMessage("ERROR", "Cannot read the specified directory", "Main")
 			os.Exit(1)
 		}
 
@@ -99,7 +97,7 @@ func GetChalls(path string) []Challenge {
 					chall.ChallDir = full_chall_dir
 					err := chall.validate()
 					if err != nil {
-						fmt.Printf("error in challenge format: %s", err)
+						logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
 					} else {
 						challs = append(challs, chall)
 					}
@@ -193,5 +191,24 @@ func (c *Challenge) validate() error {
 	if !c.Visible {
 		c.Visible = false
 	}
+
+	resourceNotFound := []string{}
+
+	for _, resource := range(c.Files) {
+		if _, err := os.Stat(filepath.Join(c.ChallDir, "resources", resource)); err != nil {
+			resourceNotFound = append(resourceNotFound, resource)
+		}
+	}
+
+	if len(resourceNotFound) != 0 {
+		return fmt.Errorf("following resources were not found: %s", strings.Join(resourceNotFound, ", "))
+	}
+
+	if c.Type != "static" {
+		if _, err := os.Stat(filepath.Join(c.ChallDir, "Dockerfile")); err != nil {
+			return fmt.Errorf("chall type is %s but Dockerfile not found", c.Type)
+		}
+	}
+
 	return nil
 }
