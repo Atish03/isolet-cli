@@ -15,17 +15,35 @@ import (
 	"k8s.io/kubectl/pkg/cmd/exec"
 
 	"github.com/Atish03/isolet-cli/cp"
+	"github.com/Atish03/isolet-cli/logger"
 )
 
-func (clientset *CustomClient) StartJob(namespace, jobName, image string, export *string, challType string, command *[]string, args *[]string) (*batchv1.Job, error) {
+type JobPodEnv struct {
+	ImageName string;
+	Export    string;
+	ChallType string;
+	Registry  string
+}
+
+type ChallJob struct {
+	Namespace  string;
+	JobName    string;
+	JobImage   string;
+	JobPodEnv  JobPodEnv;
+	Command    []string;
+	Args       []string;
+	ClientSet  *CustomClient;
+}
+
+func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: jobName,
+			Name: challjob.JobName,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"job": jobName},
+					Labels: map[string]string{"job": challjob.JobName},
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -33,17 +51,25 @@ func (clientset *CustomClient) StartJob(namespace, jobName, image string, export
 					Containers: []corev1.Container{
 						{
 							Name:    "job-container",
-							Image:   image,
-							Command: *command,
-							Args:    *args,
+							Image:   challjob.JobImage,
+							Command: challjob.Command,
+							Args:    challjob.Args,
 							Env: 	 []corev1.EnvVar{
 								{
 									Name: "CHALL_EXPORT",
-									Value: *export,
+									Value: challjob.JobPodEnv.Export,
 								},
 								{
 									Name: "CHALL_TYPE",
-									Value: challType,
+									Value: challjob.JobPodEnv.ChallType,
+								},
+								{
+									Name: "CHALL_IMAGE_NAME",
+									Value: challjob.JobPodEnv.ImageName,
+								},
+								{
+									Name: "IMAGE_REGISTRY",
+									Value: challjob.JobPodEnv.Registry,
 								},
 							},	
 						},
@@ -53,13 +79,13 @@ func (clientset *CustomClient) StartJob(namespace, jobName, image string, export
 		},
 	}
 
-	jobsClient := clientset.BatchV1().Jobs(namespace)
+	jobsClient := challjob.ClientSet.BatchV1().Jobs(challjob.Namespace)
 	job, err := jobsClient.Create(context.TODO(), job, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job: %v", err)
 	}
 
-	fmt.Printf("Job %s created successfully in namespace %s\n", jobName, namespace)
+	logger.LogMessage("INFO", fmt.Sprintf("Job created successfully in namespace %s", challjob.Namespace), challjob.JobName)
 	return job, nil
 }
 
@@ -81,7 +107,7 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) error {
 				return fmt.Errorf("cannot delete job %s: %v", jobName, err)
 			}
 
-			fmt.Printf("Job '%s' completed and deleted", jobName)
+			logger.LogMessage("INFO", "Job completed and deleted", jobName)
 
 			return nil
 		}
@@ -108,9 +134,14 @@ func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest s
 				dest = fmt.Sprintf("%s/%s:%s", namespace, pod.Name, dest)
 				container := pod.Spec.Containers[0].Name
 
-				go clientset.startCopying(namespace, pod.Name, container, src, dest)
+				go func() {
+					err := clientset.startCopying(namespace, pod.Name, container, src, dest)
+					if err != nil {
+						logger.LogMessage("ERROR", fmt.Sprintf("error when copying: %v", err), jobName)
+					}
+				}()
 				
-				err = clientset.getPodLog(namespace, pod.Name)
+				err = clientset.getPodLog(namespace, pod.Name, jobName)
 				if err != nil {
 					return fmt.Errorf("error streaming logs for pod %s: %v", pod.Name, err)
 				}
@@ -121,25 +152,24 @@ func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest s
 	}
 }
 
-func (clientset *CustomClient) startCopying(namespace, podName, container, src, dest string) {
+func (clientset *CustomClient) startCopying(namespace, podName, container, src, dest string) error {
 	err := clientset.runCmdInPod(namespace, podName, []string{"touch", "/tmp/resources.lock"})
 	if err != nil {
-		fmt.Printf("error creating lock: %v", err)
-		return
+		return fmt.Errorf("error creating lock: %v", err)
 	}
 	err = clientset.copyToPod(namespace, container, src, dest)
 	if err != nil {
-		fmt.Printf("error copying: %v", err)
-		return
+		return fmt.Errorf("error copying: %v", err)
 	}
 	err = clientset.runCmdInPod(namespace, podName, []string{"rm", "/tmp/resources.lock"})
 	if err != nil {
-		fmt.Printf("error removing lock: %v", err)
-		return
+		return fmt.Errorf("error removing lock: %v", err)
 	}
+
+	return nil
 }
 
-func (clientset *CustomClient) getPodLog(namespace, podName string) error {
+func (clientset *CustomClient) getPodLog(namespace, podName, jobName string) error {
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Follow: true,
 	})
@@ -153,7 +183,7 @@ func (clientset *CustomClient) getPodLog(namespace, podName string) error {
 
 	scanner := bufio.NewScanner(logStream)
 	for scanner.Scan() {
-		fmt.Println(scanner.Text())
+		logger.LogMessage("DEBUG", scanner.Text(), jobName, podName)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -178,8 +208,7 @@ func (clientset *CustomClient) copyToPod(namespace, containerName, src, dest str
 	if err != nil {
 		return fmt.Errorf("error when running the copy command: %v", err)
 	}
-
-	fmt.Println("Successfully copied resources!")
+	
 	return nil
 }
 
