@@ -2,7 +2,7 @@ from kubernetes import client, config
 import base64, json
 
 class KubeClient():
-    def __init__(self, incluster: bool=True):
+    def __init__(self, incluster: bool=True) -> None:
         if incluster:
             config.load_incluster_config()
         else:
@@ -22,7 +22,7 @@ class KubeClient():
             print(f"Error reading Secret: {e}")
             return None
 
-    def get_registry_auth(self, repository_url: str) -> dict:
+    def get_registry_auth(self, registry_url: str) -> dict:
         enc_config = self.__get_docker_config("isolet", "isolet-registry-secret")
         
         if enc_config != None:
@@ -30,9 +30,9 @@ class KubeClient():
             if "auths" not in config:
                 raise ValueError("No auths found in Docker config.")
 
-            repository_auth = config["auths"].get(repository_url)
+            repository_auth = config["auths"].get(registry_url)
             if not repository_auth:
-                raise ValueError(f"No credentials found for repository: {repository_url}")
+                raise ValueError(f"No credentials found for repository: {registry_url}")
 
             auth = base64.b64decode(repository_auth["auth"]).decode().split(":")
             

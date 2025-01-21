@@ -1,7 +1,6 @@
 cachetools==5.5.0
 certifi==2024.12.14
 charset-normalizer==3.4.1
-docker==7.1.0
 durationpy==0.9
 google-auth==2.37.0
 idna==3.10
