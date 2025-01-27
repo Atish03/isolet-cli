@@ -19,10 +19,10 @@ import (
 )
 
 type JobPodEnv struct {
-	ImageName string;
-	Export    string;
-	ChallType string;
-	Registry  string
+	Export      string;
+	ChallType   string;
+	RegistryURL string
+	Registry    string
 }
 
 type ChallJob struct {
@@ -36,42 +36,69 @@ type ChallJob struct {
 }
 
 func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
+	var zeroPtr int32 = 0
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: challjob.JobName,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: &zeroPtr,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"job": challjob.JobName},
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					ServiceAccountName: "api-service-account",
+					ServiceAccountName: "cli-service-account",
 					Containers: []corev1.Container{
 						{
 							Name:    "job-container",
 							Image:   challjob.JobImage,
 							Command: challjob.Command,
 							Args:    challjob.Args,
-							Env: 	 []corev1.EnvVar{
-								{
-									Name: "CHALL_EXPORT",
-									Value: challjob.JobPodEnv.Export,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: func(b bool) *bool { return &b }(true),
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_ADMIN", "NET_ADMIN", "NET_RAW"},
 								},
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeUnconfined,
+								},
+							},
+							Env: 	 []corev1.EnvVar{
 								{
 									Name: "CHALL_TYPE",
 									Value: challjob.JobPodEnv.ChallType,
 								},
 								{
-									Name: "CHALL_IMAGE_NAME",
-									Value: challjob.JobPodEnv.ImageName,
-								},
-								{
 									Name: "IMAGE_REGISTRY",
 									Value: challjob.JobPodEnv.Registry,
 								},
+								{
+									Name: "IMAGE_REGISTRY_URL",
+									Value: challjob.JobPodEnv.RegistryURL,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config-vol",
+									MountPath: "/config",
+									ReadOnly:  true,
+								},
 							},	
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name:         "config-vol",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: challjob.JobName,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -89,7 +116,7 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	return job, nil
 }
 
-func (clientset *CustomClient) DeleteJob(namespace, jobName string) error {
+func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error) {
 	deletePolicy := metav1.DeletePropagationForeground
 	deleteOptions := metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
@@ -98,22 +125,35 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) error {
 	for {
 		job, err := clientset.BatchV1().Jobs(namespace).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("cannot get job %s: %v", jobName, err)
+			return false, fmt.Errorf("cannot get job %s: %v", jobName, err)
 		}
 		
-		if job.Status.Succeeded == 1 {
+		if job.Status.Succeeded == 1 || job.Status.Failed == 1 {
 			err := clientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, deleteOptions)
 			if err != nil {
-				return fmt.Errorf("cannot delete job %s: %v", jobName, err)
+				return false, fmt.Errorf("cannot delete job %s: %v", jobName, err)
 			}
 
 			logger.LogMessage("INFO", "Job completed and deleted", jobName)
 
-			return nil
+			if job.Status.Succeeded == 1 {
+				return true, nil
+			} else {
+				return false, nil
+			}
 		}
 
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func (clientset *CustomClient) DeleteConfigMap(namespace, mapName string) error {
+	err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), mapName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("cannot delete configmap %s: %v", mapName, err)
+	}
+
+	return nil
 }
 
 func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest string) error {

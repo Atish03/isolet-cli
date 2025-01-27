@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 
+	"github.com/Atish03/isolet-cli/logger"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -20,7 +21,7 @@ type CustomClient struct {
 	Config *rest.Config
 }
 
-func GetClient() (CustomClient, error) {
+func GetClient() (CustomClient) {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -31,7 +32,8 @@ func GetClient() (CustomClient, error) {
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		return CustomClient{}, fmt.Errorf("cannot get config for kubernetes: %v", err)
+		logger.LogMessage("ERROR", fmt.Sprintf("cannot get config for cluster: %v", err), "Main")
+		return CustomClient{}
 	}
 
 	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
@@ -40,10 +42,11 @@ func GetClient() (CustomClient, error) {
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return CustomClient{}, fmt.Errorf("cannot create client from config: %v", err)
+		logger.LogMessage("ERROR", fmt.Sprintf("cannot get client for config: %v", err), "Main")
+		return CustomClient{}
 	}
 	
 	clientset := CustomClient{client, config}
 
-	return clientset, nil
+	return clientset
 }
