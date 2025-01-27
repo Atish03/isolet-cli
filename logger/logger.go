@@ -12,6 +12,7 @@ var (
 	infoStyle  = color.New(color.FgGreen, color.Bold).SprintfFunc()
 	errorStyle = color.New(color.FgRed, color.Bold).SprintfFunc()
 	debugStyle = color.New(color.FgBlue).SprintfFunc()
+	warnStyle  = color.New(color.FgYellow).SprintFunc()
 	textStyle  = color.RGB(175, 175, 175).SprintFunc()
 )
 
@@ -27,6 +28,8 @@ func LogMessage(level string, message string, prefix ...string) {
 		coloredLevel = errorStyle("[ERROR]")
 	case "DEBUG":
 		coloredLevel = debugStyle("[DEBUG]")
+	case "WARN":
+		coloredLevel = warnStyle("[WARN]")
 	default:
 		coloredLevel = fmt.Sprintf("[%s]", level)
 	}
