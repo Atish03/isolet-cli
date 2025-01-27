@@ -1,9 +1,11 @@
 package challenge
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/Atish03/isolet-cli/logger"
@@ -25,17 +27,24 @@ type Challenge struct {
     Tags         []string `yaml:"tags"`
     Links        []string `yaml:"links"`
 	ChallDir     string
+	ChallCache   ChallCache
+	PrevCache    ChallCache
 }
 
 type Hint struct {
-    Hint string  `yaml:"hint"`
-    Cost int     `yaml:"cost"`
-	Visible bool `yaml:"visible"`
+    Hint    string `yaml:"hint"`
+    Cost    int    `yaml:"cost"`
+	Visible bool   `yaml:"visible"`
 }
 
 type ExportStruct struct {
-	ChallQuery string `json:"chall_query"`
-	HintsQuery string `json:"hints_query"`
+	CategoryQuery string   `json:"category_query"`
+	ChallQuery    string   `json:"chall_query"`
+	HintsQuery    string   `json:"hints_query"`
+	HintsChanged  bool     `json:"hints_changed"`
+	ChallChanged  bool     `json:"chall_changed"`
+	DockerChanged []string `json:"docker_changed"`
+	ResChanged    []string `json:"res_changed"`
 }
 
 func parseChallFile(filename string) (chall Challenge) {
@@ -55,6 +64,12 @@ func parseChallFile(filename string) (chall Challenge) {
 	return
 }
 
+func isValidJobName(name string) bool {
+	regex := `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	jobNameRegex := regexp.MustCompile(regex)
+	return jobNameRegex.MatchString(name) && len(name) <= 253
+}
+
 func isValidChallDir(path string) bool {
 	files, err := os.ReadDir(path)
 	if err != nil {
@@ -63,6 +78,11 @@ func isValidChallDir(path string) bool {
 
 	for _, entry := range(files) {
 		if !entry.IsDir() && entry.Name() == "chall.yaml" {
+			dirName := filepath.Base(filepath.Clean(path))
+			if !isValidJobName(dirName) {
+				logger.LogMessage("WARN", fmt.Sprintf("ignoring directory %s since it does not follow RFC 1123", path), "Parser")
+				return false
+			}
 			return true
 		}
 	}
@@ -70,7 +90,7 @@ func isValidChallDir(path string) bool {
 	return false
 }
 
-func GetChalls(path string) []Challenge {
+func GetChalls(path string, noCache bool) []Challenge {
 	var challs []Challenge
 
 	if isValidChallDir(path) {
@@ -80,6 +100,10 @@ func GetChalls(path string) []Challenge {
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
 		} else {
+			err := chall.GenerateCache(noCache)
+			if err != nil {
+				logger.LogMessage("WARN", fmt.Sprintf("couldn't generate cache for chall %s: %v", path, err), "Main")
+			}
 			challs = append(challs, chall)
 		}
 	} else {
@@ -99,6 +123,10 @@ func GetChalls(path string) []Challenge {
 					if err != nil {
 						logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
 					} else {
+						err := chall.GenerateCache(noCache)
+						if err != nil {
+							logger.LogMessage("WARN", fmt.Sprintf("couldn't generate cache for chall %s: %v", path, err), "Main")
+						}
 						challs = append(challs, chall)
 					}
 				}
@@ -117,8 +145,8 @@ func formatArray(arr []string) string {
 	return "{" + strings.Join(escapedElements, ",") + "}"
 }
 
-func (c *Challenge) GetExportStruct() (exp *ExportStruct, err error) {
-	exp = &ExportStruct{}
+func (c *Challenge) GetExportStruct() (expString string, err error) {
+	exp := &ExportStruct{}
 
 	filesJSON := formatArray(c.Files)
 	tagsJSON := formatArray(c.Tags)
@@ -132,7 +160,33 @@ func (c *Challenge) GetExportStruct() (exp *ExportStruct, err error) {
 		vis = "FALSE"
 	}
 
-	challQuery := fmt.Sprintf(`INSERT INTO challenges (chall_name, type, prompt, points, files, flag, author, visible, tags, links) VALUES ('%s', '%s', '%s', %d, '%s', '%s', '%s', %s, '%s', '%s')`,
+	categoryQuery := fmt.Sprintf(`
+	INSERT INTO categories
+	(category_name)
+	VALUES ('%s')
+	ON CONFLICT (category_name)
+	DO UPDATE SET
+		category_name = EXCLUDED.category_name
+	RETURNING category_id
+	`, c.CategoryName)
+
+	challQuery := fmt.Sprintf(`
+	INSERT INTO challenges
+	(chall_name, category_id, type, prompt, points, files, flag, author, visible, tags, links)
+	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', '%s', %s, '%s', '%s')
+	ON CONFLICT (chall_name)
+	DO UPDATE SET
+		category_id = EXCLUDED.category_id,
+		type = EXCLUDED.type,
+		prompt = EXCLUDED.prompt,
+		points = EXCLUDED.points,
+		files = EXCLUDED.files,
+		author = EXCLUDED.author,
+		visible = EXCLUDED.visible,
+		tags = EXCLUDED.tags,
+		links = EXCLUDED.links
+	RETURNING chall_id
+	`,
 		c.ChallName,
 		c.Type,
 		c.Prompt,
@@ -154,16 +208,66 @@ func (c *Challenge) GetExportStruct() (exp *ExportStruct, err error) {
 		case false:
 			vis = "FALSE"
 		}
-		escapedHint := strings.ReplaceAll(hint.Hint, "'", `\'`)
-		values[i] = fmt.Sprintf("(__CHALL_ID__, '%s', %d, %s)", escapedHint, hint.Cost, vis)
+		escapedHint := strings.ReplaceAll(hint.Hint, "'", `''`)
+		values[i] = fmt.Sprintf("($CHALL_ID, '%s', %d, %s)", escapedHint, hint.Cost, vis)
 	}
 
 	hintQuery += strings.Join(values, ", ")
+	hintQuery += " RETURNING hid"
 
+	exp.CategoryQuery = categoryQuery
 	exp.ChallQuery = challQuery
 	exp.HintsQuery = hintQuery
 
+	exp.updateChanges(c)
+
+	expjson, err := json.Marshal(exp)
+	if err != nil {
+		return "", fmt.Errorf("cannot marshal export data: %v", err)
+	}
+
+	expString = string(expjson)
+
 	return
+}
+
+func (exp *ExportStruct) updateChanges(chall *Challenge) error {
+	cache := chall.PrevCache
+
+	newDockerHashes := chall.ChallCache.DockerHashs
+	cachedDockerHashes := cache.DockerHashs
+	dockersToBuild := []string{}
+
+	for key, val := range(newDockerHashes) {
+		cachedHash := cachedDockerHashes[key]
+		if cachedHash != val {
+			dockersToBuild = append(dockersToBuild, key)
+		}
+	}
+
+	newResHashes := chall.ChallCache.ResHashs
+	cachedResHashes := cache.ResHashs
+	resToUpload := []string{}
+
+	for key, val := range(newResHashes) {
+		cachedHash := cachedResHashes[key]
+		if cachedHash != val {
+			resToUpload = append(resToUpload, key)
+		}
+	}
+
+	if chall.ChallCache.HintsHash != cache.HintsHash {
+		exp.HintsChanged = true
+	}
+
+	if chall.ChallCache.ChallHash != cache.ChallHash {
+		exp.ChallChanged = true
+	}
+
+	exp.DockerChanged = dockersToBuild
+	exp.ResChanged = resToUpload
+
+	return nil
 }
 
 func (c *Challenge) validate() error {
@@ -205,8 +309,22 @@ func (c *Challenge) validate() error {
 	}
 
 	if c.Type != "static" {
-		if _, err := os.Stat(filepath.Join(c.ChallDir, "Dockerfile")); err != nil {
-			return fmt.Errorf("chall type is %s but Dockerfile not found", c.Type)
+		file, err := os.Stat(filepath.Join(c.ChallDir, "Dockerfiles"))
+		if err != nil {
+			return fmt.Errorf("chall '%s' has type %s but Dockerfiles directory was not found", c.ChallDir, c.Type)
+		}
+
+		if !file.IsDir() {
+			return fmt.Errorf("not a directory: Dockerfiles")
+		}
+
+		images, _ := os.ReadDir(filepath.Join(c.ChallDir, "Dockerfiles"))
+		for _, image := range(images) {
+			_, err := os.Stat(filepath.Join(c.ChallDir, "Dockerfiles", image.Name(), "Dockerfile"))
+			if err != nil {
+				return fmt.Errorf("file Dockerfile was not found in directory '%s'", filepath.Join(c.ChallDir, "Dockerfiles", image.Name()))
+			}
+
 		}
 	}
 
