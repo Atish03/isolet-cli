@@ -55,7 +55,7 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace, registry, regi
 		chall.SaveCache()
 	}
 
-	err = cli.DeleteConfiMap(namespace, configMap.Name)
+	err = cli.DeleteConfigMap(namespace, configMap.Name)
 	if err != nil {
 		return err
 	}
