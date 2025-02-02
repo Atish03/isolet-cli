@@ -26,6 +26,10 @@ type Challenge struct {
     Visible      bool     `yaml:"visible,omitempty"`
     Tags         []string `yaml:"tags"`
     Links        []string `yaml:"links"`
+	DepType      string   `yaml:"deployment_type,omitempty"`
+	DepPort      int      `yaml:"deployment_port,omitempty"`
+	CPU          int      `yaml:"cpu,omitempty"`
+	Memory       int      `yaml:"mem,omitempty"`
 	ChallDir     string
 	ChallCache   ChallCache
 	PrevCache    ChallCache
@@ -41,10 +45,19 @@ type ExportStruct struct {
 	CategoryQuery string   `json:"category_query"`
 	ChallQuery    string   `json:"chall_query"`
 	HintsQuery    string   `json:"hints_query"`
+	DepMeta       DepMeta  `json:"deployment_metadata"`
 	HintsChanged  bool     `json:"hints_changed"`
 	ChallChanged  bool     `json:"chall_changed"`
 	DockerChanged []string `json:"docker_changed"`
 	ResChanged    []string `json:"res_changed"`
+}
+
+type DepMeta struct {
+	DepType   string `json:"deployment_type"`
+	DepPort   int    `json:"deployment_port"`
+	Subdomain string `json:"subdomain"`
+	CPU       int    `json:"cpu"`
+	Memory    int    `json:"mem"`
 }
 
 func parseChallFile(filename string) (chall Challenge) {
@@ -145,6 +158,25 @@ func formatArray(arr []string) string {
 	return "{" + strings.Join(escapedElements, ",") + "}"
 }
 
+func convertToSubdomain(input string) string {
+	subdomain := strings.ToLower(input)
+
+	re := regexp.MustCompile(`[^a-z0-9-]`)
+	subdomain = re.ReplaceAllString(subdomain, "-")
+
+	subdomain = strings.Trim(subdomain, "-")
+
+	if len(subdomain) > 63 {
+		subdomain = subdomain[:63]
+	}
+
+	if subdomain == "" {
+		subdomain = "example"
+	}
+
+	return subdomain
+}
+
 func (c *Challenge) GetExportStruct() (expString string, err error) {
 	exp := &ExportStruct{}
 
@@ -221,6 +253,23 @@ func (c *Challenge) GetExportStruct() (expString string, err error) {
 
 	exp.updateChanges(c)
 
+	exp.DepMeta.DepType = c.DepType
+	exp.DepMeta.DepPort = c.DepPort
+
+	if c.CPU != 0 {
+		exp.DepMeta.CPU = c.CPU
+	} else {
+		exp.DepMeta.CPU = 15
+	}
+
+	if c.Memory != 0 {
+		exp.DepMeta.Memory = c.Memory
+	} else {
+		exp.DepMeta.Memory = 32
+	}
+
+	exp.DepMeta.Subdomain = convertToSubdomain(c.ChallName)
+
 	expjson, err := json.Marshal(exp)
 	if err != nil {
 		return "", fmt.Errorf("cannot marshal export data: %v", err)
@@ -272,25 +321,25 @@ func (exp *ExportStruct) updateChanges(chall *Challenge) error {
 
 func (c *Challenge) validate() error {
 	if c.ChallName == "" {
-		return fmt.Errorf("chall_name is required")
+		return fmt.Errorf("%s: chall_name is required", c.ChallDir)
 	}
 	if c.Type == "" {
-		return fmt.Errorf("type is required")
+		return fmt.Errorf("%s: type is required", c.ChallDir)
 	}
 	if c.CategoryName == "" {
-		return fmt.Errorf("category_name is required")
+		return fmt.Errorf("%s: category_name is required", c.ChallDir)
 	}
 	if c.Prompt == "" {
-		return fmt.Errorf("prompt is required")
+		return fmt.Errorf("%s: prompt is required", c.ChallDir)
 	}
 	if c.Points == 0 {
-		return fmt.Errorf("points is required")
+		return fmt.Errorf("%s: points is required", c.ChallDir)
 	}
 	if c.Flag == "" {
-		return fmt.Errorf("flag is required")
+		return fmt.Errorf("%s: flag is required", c.ChallDir)
 	}
 	if c.Author == "" {
-		return fmt.Errorf("author is required")
+		return fmt.Errorf("%s: author is required", c.ChallDir)
 	}
 	if !c.Visible {
 		c.Visible = false
@@ -325,6 +374,16 @@ func (c *Challenge) validate() error {
 				return fmt.Errorf("file Dockerfile was not found in directory '%s'", filepath.Join(c.ChallDir, "Dockerfiles", image.Name()))
 			}
 
+		}
+	}
+
+	if c.Type == "dynamic" {
+		if c.DepPort == 0 || c.DepType == "" {
+			return fmt.Errorf("%s: challenge type was dynamic but the deployment type and port were not mentioned", c.ChallDir)
+		}
+
+		if c.DepType != "http" && c.DepType != "nc" && c.DepType != "ssh" {
+			return fmt.Errorf("%s: deployment type can be one of ('http', 'ssh' or 'nc')", c.ChallDir)
 		}
 	}
 

@@ -1,3 +1,5 @@
 test/
-job-image/__pycache__
-job-image/automation-job
+job-load/program/__pycache__
+job-load/automation-job
+job-deploy/deployment
+job-deploy/program/__pycache__

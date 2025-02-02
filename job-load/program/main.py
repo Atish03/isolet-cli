@@ -2,7 +2,8 @@ import os, time
 import kubernetes_client
 import subprocess
 import json
-import container_image, database
+import container_image, database, resources
+import traceback
 
 MAX_WAIT = 150 # approx 5 mins
 
@@ -29,16 +30,23 @@ if __name__ == "__main__":
     lock_file = "/tmp/resources.lock"
 
     wait_until_copying(source_dir, lock_file)
-
-    os.chdir(source_dir)
     
     try:
         image_worker = container_image.ContainerImage()
-        image_worker.build_and_push_images()
-        
+        phoros_worker = resources.Resources()
         db = database.Database()
-        db.update_all()
+        
+        image_names = image_worker.build_and_push_images()
+        urls = phoros_worker.upload()
+        chall_id = db.update_all()
+        
+        if len(image_names) == 1:
+            db.update_images_table(chall_id, image_names[0])
+        
+        db.update_links(chall_id, urls)
+         
+        db.commit()
         db.close()
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
         exit(1)

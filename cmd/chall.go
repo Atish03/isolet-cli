@@ -47,10 +47,11 @@ func loadChalls(challs []challenge.Challenge) {
 		wg.Add(1)
 		
 		go func(){
-			err := chall.Load(&kubecli, "automation", "docker.io/b3gul4", "https://index.docker.io/v1/", &wg)
+			err := chall.Load(&kubecli, "automation", "asia-south1-docker.pkg.dev/amiable-aquifer-449113-q1/pearlctf-dev/")
 			if err != nil {
 				logger.LogMessage("ERROR", fmt.Sprintf("error loading challenge: %v", err), "Main")
 			}
+			wg.Done()
 		}()
 	}
 

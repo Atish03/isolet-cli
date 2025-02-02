@@ -19,10 +19,10 @@ import (
 )
 
 type JobPodEnv struct {
-	Export      string;
 	ChallType   string;
-	RegistryURL string
-	Registry    string
+	Registry    string;
+	AdminSecret string;
+	Public_URL  string;
 }
 
 type ChallJob struct {
@@ -37,6 +37,7 @@ type ChallJob struct {
 
 func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	var zeroPtr int32 = 0
+	dockerConfigMap := challjob.ClientSet.GetRegistrySecretName("automation", challjob.JobPodEnv.ChallType)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,11 +58,9 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 							Image:   challjob.JobImage,
 							Command: challjob.Command,
 							Args:    challjob.Args,
+							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: func(b bool) *bool { return &b }(true),
-								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"SYS_ADMIN", "NET_ADMIN", "NET_RAW"},
-								},
 								SeccompProfile: &corev1.SeccompProfile{
 									Type: corev1.SeccompProfileTypeUnconfined,
 								},
@@ -76,8 +75,12 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 									Value: challjob.JobPodEnv.Registry,
 								},
 								{
-									Name: "IMAGE_REGISTRY_URL",
-									Value: challjob.JobPodEnv.RegistryURL,
+									Name: "ADMIN_SECRET",
+									Value: challjob.JobPodEnv.AdminSecret,
+								},
+								{
+									Name: "PUBLIC_URL",
+									Value: challjob.JobPodEnv.Public_URL,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -106,8 +109,29 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 		},
 	}
 
+	if dockerConfigMap != nil {
+		dockerCM := corev1.Volume{
+			Name:         "docker-config",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: *dockerConfigMap,
+				},
+			},
+		}
+
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, dockerCM)
+
+		dockerVolMount := corev1.VolumeMount{
+			Name:      "docker-config",
+			MountPath: "/docker",
+			ReadOnly:  true,
+		}
+
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts, dockerVolMount)
+	}
+
 	jobsClient := challjob.ClientSet.BatchV1().Jobs(challjob.Namespace)
-	job, err := jobsClient.Create(context.TODO(), job, metav1.CreateOptions{})
+	job, err := jobsClient.Create(context.Background(), job, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job: %v", err)
 	}
@@ -123,13 +147,13 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error
 	}
 
 	for {
-		job, err := clientset.BatchV1().Jobs(namespace).Get(context.TODO(), jobName, metav1.GetOptions{})
+		job, err := clientset.BatchV1().Jobs(namespace).Get(context.Background(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("cannot get job %s: %v", jobName, err)
 		}
 		
 		if job.Status.Succeeded == 1 || job.Status.Failed == 1 {
-			err := clientset.BatchV1().Jobs(namespace).Delete(context.TODO(), jobName, deleteOptions)
+			err := clientset.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, deleteOptions)
 			if err != nil {
 				return false, fmt.Errorf("cannot delete job %s: %v", jobName, err)
 			}
@@ -148,7 +172,7 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error
 }
 
 func (clientset *CustomClient) DeleteConfigMap(namespace, mapName string) error {
-	err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), mapName, metav1.DeleteOptions{})
+	err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.Background(), mapName, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot delete configmap %s: %v", mapName, err)
 	}
@@ -160,7 +184,7 @@ func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest s
 	labelSelector := fmt.Sprintf("job=%s", jobName)
 
 	for {
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
@@ -214,7 +238,7 @@ func (clientset *CustomClient) getPodLog(namespace, podName, jobName string) err
 		Follow: true,
 	})
 
-	logStream, err := req.Stream(context.TODO())
+	logStream, err := req.Stream(context.Background())
 	if err != nil {
 		return fmt.Errorf("error opening log stream for pod %s: %w", podName, err)
 	}

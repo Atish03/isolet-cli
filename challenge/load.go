@@ -3,24 +3,33 @@ package challenge
 import (
 	"fmt"
 	"path/filepath"
-	"sync"
 
 	"github.com/Atish03/isolet-cli/client"
 )
 
-func (chall *Challenge) Load(cli *client.CustomClient, namespace, registry, registry_url string, waitgroup *sync.WaitGroup) error {
-	defer waitgroup.Done()
-
+func (chall *Challenge) Load(cli *client.CustomClient, namespace, registry string) error {
 	job_name := filepath.Base(filepath.Clean(chall.ChallDir))
+	registry = filepath.Clean(registry)
+
+	adminSecret, err := cli.GetAdminSecret()
+	if err != nil {
+		return fmt.Errorf("cannot get admin secret: %v", err)
+	}
+
+	publicURL, err := cli.GetPublicURL()
+	if err != nil {
+		return fmt.Errorf("cannot get public URL: %v", err)
+	}
 
 	job := client.ChallJob {
 		Namespace: namespace,
 		JobName:   job_name,
-		JobImage:  "b3gul4/isolet-automation-chall:latest",
+		JobImage:  "b3gul4/isolet-automation-chall:v0.1.15",
 		JobPodEnv: client.JobPodEnv {
 			ChallType:   chall.Type,
-			RegistryURL: registry_url,
 			Registry:    registry,
+			AdminSecret: adminSecret,
+			Public_URL:  publicURL,
 		},
 		Command:   []string{"python", "-u", "main.py"},
 		Args:      []string{},

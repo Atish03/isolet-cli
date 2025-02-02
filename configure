@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Default prefix
+PREFIX="/usr/local"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prefix=*)
+      PREFIX="${1#*=}"
+      shift
+      ;;
+    *)
+      echo "Usage: configure [--prefix=DIR]"
+      exit 1
+      ;;
+  esac
+done
+
+# Generate config.mk file
+echo "PREFIX=$PREFIX" > config.mk
+
+echo "Configured with prefix: $PREFIX"

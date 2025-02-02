@@ -61,7 +61,7 @@ func (chall *Challenge) GenerateCache(noCache bool) error {
 			}
 		}
 
-		chall.ChallCache.ResHashs    = resHashes
+		chall.ChallCache.ResHashs = resHashes
 	}
 
 	hintsHash, err := hashStruct(chall.Hints)

@@ -69,11 +69,45 @@ class Database():
             delete_query = f"DELETE FROM hints WHERE hid = {hid}"
             self.cursor.execute(delete_query)
     
-    def update_all(self):
+    def update_all(self) -> int:
         category_id = self.__insert_category()
         chall_id = self.__insert_chall(category_id)
         hids = self.__insert_hints(chall_id)
         
+        return chall_id
+        
+    def update_images_table(self, chall_id: int, image_name: str) -> None:
+        query = """
+        INSERT INTO images
+        (chall_id, image, deployment, port, subd, cpu, mem)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (chall_id)
+        DO UPDATE SET
+            image = EXCLUDED.image,
+            deployment = EXCLUDED.deployment,
+            port = EXCLUDED.port,
+            subd = EXCLUDED.subd,
+            cpu = EXCLUDED.cpu,
+            mem = EXCLUDED.mem
+        """
+        
+        self.cursor.execute(query, (chall_id, image_name,
+                                    self.config["deployment_metadata"]["deployment_type"],
+                                    self.config["deployment_metadata"]["deployment_port"],
+                                    self.config["deployment_metadata"]["subdomain"],
+                                    self.config["deployment_metadata"]["cpu"],
+                                    self.config["deployment_metadata"]["mem"]))
+        
+    def update_links(self, chall_id: int, links: list) -> None:
+        query = """
+        UPDATE challenges
+        SET files = %s
+        WHERE chall_id = %s
+        """
+        
+        self.cursor.execute(query, (links, chall_id))
+        
+    def commit(self):
         self.conn.commit()
     
     def close(self):
