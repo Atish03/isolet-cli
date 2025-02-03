@@ -82,6 +82,10 @@ func (chall *Challenge) GenerateCache(noCache bool) error {
 		Visible: chall.Visible,
 		Tags: chall.Tags,
 		Links: chall.Links,
+		DepType: chall.DepType,
+		DepPort: chall.DepPort,
+		CPU: chall.CPU,
+		Memory: chall.Memory,
 	}
 
 	challHash, err := hashStruct(challCopy)

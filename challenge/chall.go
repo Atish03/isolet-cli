@@ -158,7 +158,7 @@ func formatArray(arr []string) string {
 	return "{" + strings.Join(escapedElements, ",") + "}"
 }
 
-func convertToSubdomain(input string) string {
+func ConvertToSubdomain(input string) string {
 	subdomain := strings.ToLower(input)
 
 	re := regexp.MustCompile(`[^a-z0-9-]`)
@@ -268,7 +268,7 @@ func (c *Challenge) GetExportStruct() (expString string, err error) {
 		exp.DepMeta.Memory = 32
 	}
 
-	exp.DepMeta.Subdomain = convertToSubdomain(c.ChallName)
+	exp.DepMeta.Subdomain = ConvertToSubdomain(c.ChallName)
 
 	expjson, err := json.Marshal(exp)
 	if err != nil {
