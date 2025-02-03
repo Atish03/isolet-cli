@@ -48,8 +48,8 @@ class Patch:
         
         self.v1.patch_namespaced_service(name=self.TRAEFIK_SERVICE, namespace=self.TRAEFIK_NAMESPACE, body=self.service)
         
-        if not self.deployment.metadata.annotations:
-            self.deployment.metadata.annotations = {}
-        self.deployment.metadata.annotations["kubectl.kubernetes.io/restartedAt"] = datetime.datetime.now().isoformat()
-
+        if not self.deployment.spec.template.metadata.annotations:
+            self.deployment.spec.template.metadata.annotations = {}
+            
+        self.deployment.spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"] = datetime.datetime.utcnow().isoformat()
         self.api.patch_namespaced_deployment(name=self.TRAEFIK_DEPLOYMENT, namespace=self.TRAEFIK_NAMESPACE, body=self.deployment)
