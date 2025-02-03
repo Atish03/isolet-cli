@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Atish03/isolet-cli/challenge"
@@ -16,7 +17,8 @@ var kubecli = client.GetClient()
 
 func init() {
 	loadCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable cache while loading")
-	challCmd.AddCommand(lsCmd, testCmd, loadCmd)
+	deployCmd.Flags().BoolVar(&force, "force", false, "Force deploy a challenge")
+	challCmd.AddCommand(lsCmd, testCmd, loadCmd, deployCmd, undeployCmd)
   	rootCmd.AddCommand(challCmd)
 }
 
@@ -47,11 +49,10 @@ func loadChalls(challs []challenge.Challenge) {
 		wg.Add(1)
 		
 		go func(){
-			err := chall.Load(&kubecli, "automation", "asia-south1-docker.pkg.dev/amiable-aquifer-449113-q1/pearlctf-dev/")
+			err := chall.Load(&kubecli, "automation", "asia-south1-docker.pkg.dev/amiable-aquifer-449113-q1/pearlctf-dev/", &wg)
 			if err != nil {
 				logger.LogMessage("ERROR", fmt.Sprintf("error loading challenge: %v", err), "Main")
 			}
-			wg.Done()
 		}()
 	}
 
@@ -59,6 +60,7 @@ func loadChalls(challs []challenge.Challenge) {
 }
 
 var noCache bool
+var force bool
 
 var challCmd = &cobra.Command{
 	Use:   "chall",
@@ -73,13 +75,17 @@ please refer https://github.com/Atish03/isolet-cli/# for more information on dir
 
 var lsCmd = &cobra.Command{
 	Use:   "ls <dir>",
-	Short: "List all challenges in a particular directory\nDirectory may be the challenge directory or the parent of all challenge directories.",
+	Short: "List all challenges in a particular directory",
 	Run: func(cmd *cobra.Command, args []string) {
-		dir := "./"
+		dir := "."
 		if len(args) != 0 {
 			dir = args[0]
 		}
-		challs := challenge.GetChalls(dir, false)
+		challDir, err := filepath.Abs(dir)
+		if err != nil {
+			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
+		}
+		challs := challenge.GetChalls(challDir, false)
 		drawChallTable(challs)
 	},
 }
@@ -98,11 +104,49 @@ var loadCmd = &cobra.Command{
 	Use:   "load <chall_name>",
 	Short: "Load a specific challenge or challenges in directory",
 	Run: func(cmd *cobra.Command, args []string) {
-		dir := "./"
+		dir := "."
 		if len(args) != 0 {
 			dir = args[0]
 		}
-		challs := challenge.GetChalls(dir, noCache)
+		challDir, err := filepath.Abs(dir)
+		if err != nil {
+			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
+		}
+		challs := challenge.GetChalls(challDir, noCache)
 		loadChalls(challs)
+	},
+}
+
+var deployCmd = &cobra.Command{
+	Use: "deploy <dir>",
+	Short: "Deploy challenges/challenge in a directory\nNOTE: This will only search for dynamic challenges since static and on-demand don't require manual deployment",
+	Run: func(cmd *cobra.Command, args []string) {
+		dir := "."
+		if len(args) != 0 {
+			dir = args[0]
+		}
+		challDir, err := filepath.Abs(dir)
+		if err != nil {
+			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
+		}
+		challs := challenge.GetChalls(challDir, noCache)
+		deployChalls(challs, force)
+	},
+}
+
+var undeployCmd = &cobra.Command{
+	Use: "undeploy <dir>",
+	Short: "Undeploy dynamic challenges",
+	Run: func(cmd *cobra.Command, args []string) {
+		dir := "."
+		if len(args) != 0 {
+			dir = args[0]
+		}
+		challDir, err := filepath.Abs(dir)
+		if err != nil {
+			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
+		}
+		challs := challenge.GetChalls(challDir, noCache)
+		deleteChalls(challs)
 	},
 }
