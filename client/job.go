@@ -35,9 +35,17 @@ type ChallJob struct {
 	ClientSet  *CustomClient;
 }
 
+type DeployJob struct {
+	Namespace string;
+	JobName   string;
+	JobImage  string;
+	Domain    string
+	ClientSet *CustomClient;
+}
+
 func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	var zeroPtr int32 = 0
-	dockerConfigMap := challjob.ClientSet.GetRegistrySecretName("automation", challjob.JobPodEnv.ChallType)
+	dockerConfigMap := challjob.ClientSet.GetRegistrySecretName(challjob.Namespace, challjob.JobPodEnv.ChallType)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +148,70 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	return job, nil
 }
 
-func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error) {
+func (deployjob *DeployJob) StartJob() (*batchv1.Job, error) {
+	var zeroPtr int32 = 0
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deployjob.JobName,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &zeroPtr,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"job": deployjob.JobName},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					ServiceAccountName: "deploy-sa",
+					Containers: []corev1.Container{
+						{
+							Name:    "job-container",
+							Image:   deployjob.JobImage,
+							ImagePullPolicy: corev1.PullAlways,
+							Env: 	 []corev1.EnvVar{
+								{
+									Name: "DOMAIN_NAME",
+									Value: deployjob.Domain,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "challs-vol",
+									MountPath: "/config",
+									ReadOnly:  true,
+								},
+							},	
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name:         "challs-vol",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: deployjob.JobName,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	jobsClient := deployjob.ClientSet.BatchV1().Jobs(deployjob.Namespace)
+	job, err := jobsClient.Create(context.Background(), job, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create job: %v", err)
+	}
+
+	logger.LogMessage("INFO", fmt.Sprintf("Job created successfully in namespace %s", deployjob.Namespace), deployjob.JobName)
+	return job, nil
+}
+
+func (clientset *CustomClient) DeleteJobAndCM(namespace, jobName, configMapName string) (bool, error) {
 	deletePolicy := metav1.DeletePropagationForeground
 	deleteOptions := metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
@@ -158,6 +229,11 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error
 				return false, fmt.Errorf("cannot delete job %s: %v", jobName, err)
 			}
 
+			err = clientset.DeleteConfigMap(namespace, configMapName)
+			if err != nil {
+				return false, err
+			}
+
 			logger.LogMessage("INFO", "Job completed and deleted", jobName)
 
 			if job.Status.Succeeded == 1 {
@@ -169,15 +245,6 @@ func (clientset *CustomClient) DeleteJob(namespace, jobName string) (bool, error
 
 		time.Sleep(2 * time.Second)
 	}
-}
-
-func (clientset *CustomClient) DeleteConfigMap(namespace, mapName string) error {
-	err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.Background(), mapName, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("cannot delete configmap %s: %v", mapName, err)
-	}
-
-	return nil
 }
 
 func (clientset *CustomClient) CopyAndStreamLogs(namespace, jobName, src, dest string) error {
