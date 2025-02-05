@@ -50,7 +50,7 @@ links (optional):
   - "https://wiki.com/sql_injection"
 files (optional):
   - "file.txt" # Must match the file name in resources directory
-	
+
 # Only for dynamic challenges
 
 deployment_type: http
