@@ -1,6 +1,8 @@
-from kubernetes import client, config
+from kubernetes import client, config, utils
 import base64, json
 import os
+import yaml
+from patch import Patch
 
 class KubeClient():
     def __init__(self, incluster: bool=True) -> None:
@@ -11,6 +13,7 @@ class KubeClient():
             
         self.v1 = client.CoreV1Api()
         self.app = client.AppsV1Api()
+        self.api = client.ApiClient()
         self.custom_api = client.CustomObjectsApi()
         self.DOMAIN = os.environ.get("DOMAIN_NAME", "localhost")
         
@@ -118,7 +121,7 @@ class KubeClient():
             entrypoints = [subd]
             
             if url:
-                routes_match = f"HostSNI(`{url}`)"
+                routes_match = f"Host(`{url}`)"
                 entrypoints = ["web", "websecure"]
             
             ingress_route_tcp = {
@@ -163,7 +166,7 @@ class KubeClient():
         except Exception as e:
             print(e)
             
-    def expose_chall(self, subd: str, image: str, port: int, private: bool):
+    def expose_chall(self, subd: str, image: str, port: int, private: bool) -> None:
         url = None
         if port == 80:
             url = f"{subd}.ctf.{self.DOMAIN}"
@@ -171,3 +174,27 @@ class KubeClient():
         self.__deploy_pods(subd, image, port, private)
         self.__start_svc(subd, port)
         self.__define_ingress(subd, url)
+        
+    def apply(self, chall: dict, p: Patch) -> None:        
+        yaml_objects = list(yaml.safe_load_all(chall["yaml_string"]))
+        
+        group = "traefik.io"
+        version = "v1alpha1"
+        namespace = "dynamic"
+        plural = "ingressroutetcps"
+
+        for yaml_obj in yaml_objects[:-1]:
+            utils.create_from_dict(self.api, yaml_obj, namespace=namespace)
+
+        api = client.CustomObjectsApi()
+        api.create_namespaced_custom_object(
+            group=group,
+            version=version,
+            namespace=namespace,
+            plural=plural,
+            body=yaml_objects[-1],
+        )
+        
+        if chall["deployment"] != "http":
+            p.add_port_to_service(f"{yaml_objects[-1]['spec']['entryPoints'][0]}-port", chall["port"])
+            p.add_entrypoint(yaml_objects[-1]['spec']['entryPoints'][0], f":{chall['port']}")

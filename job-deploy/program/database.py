@@ -36,11 +36,13 @@ class Database():
         res = []
         
         for chall in challs:
-            chall_id = self.__get_chall_id(chall)
+            chall_id = self.__get_chall_id(chall.get("chall_name", ""))
             self.cursor.execute(query, (chall_id,))
             
             row = dict(self.cursor.fetchone())
             row["private-registry"] = self.client.check_private()
+            row["custom"] = chall.get("custom", False)
+            row["yaml_string"] = chall.get("yaml_string", "")
             res.append(row)
             
         return res
