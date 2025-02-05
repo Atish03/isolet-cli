@@ -17,8 +17,14 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+type DynChall struct {
+	ChallName string `json:"chall_name"`
+	Custom    bool   `json:"custom"`
+	YamlStr   string `json:"yaml_string"`
+}
+
 type ChallsJson struct {
-	Challs []string `json:"challs"`
+	Challs []DynChall `json:"challs"`
 }
 
 type TraefikConfig struct {
@@ -69,13 +75,17 @@ func isChallChanged(chall challenge.Challenge) bool {
 }
 
 func deployChalls(challs []challenge.Challenge, force bool) {
-	chall_names := []string {}
+	chall_names := []DynChall {}
 	exp := ChallsJson{}
 
 	for _, chall := range(challs) {
 		if chall.Type == "dynamic" {
 			if !isChallChanged(chall) || force {
-				chall_names = append(chall_names, chall.ChallName)
+				chall_names = append(chall_names, DynChall{
+					ChallName: chall.ChallName,
+					Custom: chall.CustomDeploy,
+					YamlStr: chall.YamlStr,
+				})
 			}
 		}
 	}
