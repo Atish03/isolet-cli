@@ -39,7 +39,7 @@ type DeployJob struct {
 	Namespace string;
 	JobName   string;
 	JobImage  string;
-	Domain    string
+	Domain    string;
 	ClientSet *CustomClient;
 }
 
