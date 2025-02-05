@@ -4,9 +4,6 @@
 
 > Use `--help` flag to know more about a particular command.
 
-## Challenge directory
-A challenge is a directory with the following structure
-
 ```
 .
 ├── Dockerfiles
@@ -23,7 +20,7 @@ A challenge is a directory with the following structure
 ```
 
 > [!NOTE]
->the `chall ls` command will help you list challenges in a particular directory. The directory can be the challenge directory or the parent directory of the challenge directories.
+> The `chall ls` command will help you list challenges in a particular directory. The directory can be the challenge directory or the parent directory of the challenge directories.
 
 ## chall.yaml
 `chall.yaml` file must be of following format
@@ -64,3 +61,13 @@ Similarly one can take down a deployment using `undeploy` command
 
 > [!IMPORTANT]
 > Try to work on a challenge on a single device, since syncing might cause issues, make sure that the cli tool is not used to edit challenges after the event is started, all the challenges must be managed using admin panel (except deploying dynamic challenges) since mismatch of challenge metadata may cause issues 
+
+## Installation
+
+```
+./configure --prefix=<install dir>
+make install
+
+# uninstall isolet
+make uninstall
+```
