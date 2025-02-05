@@ -31,6 +31,8 @@ type Challenge struct {
 	CPU          int      `yaml:"cpu,omitempty"`
 	Memory       int      `yaml:"mem,omitempty"`
 	ChallDir     string
+	CustomDeploy bool
+	YamlStr      string
 	ChallCache   ChallCache
 	PrevCache    ChallCache
 }
@@ -103,12 +105,43 @@ func isValidChallDir(path string) bool {
 	return false
 }
 
+func isValidDeployment(file os.FileInfo) bool {
+	// TODO: Add a validation for depoyment.yaml
+	return true
+}
+
+func isCustomChall(chall Challenge) bool {
+	file, err := os.Stat(filepath.Join(chall.ChallDir, "deployment.yaml"))
+	if err != nil {
+		return false
+	}
+
+	if !isValidDeployment(file) {
+		return false
+	}
+
+	return true
+}
+
 func GetChalls(path string, noCache bool) []Challenge {
 	var challs []Challenge
 
 	if isValidChallDir(path) {
 		chall := parseChallFile(filepath.Join(path, "chall.yaml"))
 		chall.ChallDir = path
+
+		if isCustomChall(chall) {
+			chall.CustomDeploy = true
+
+			yamlStr, err := os.ReadFile(filepath.Join(chall.ChallDir, "deployment.yaml"))
+			if err != nil {
+				logger.LogMessage("ERROR", fmt.Sprintf("cannot read deloyment.yaml file: %v", err), "Main")
+				return challs
+			}
+
+			chall.YamlStr = strings.ReplaceAll(string(yamlStr), "{{.Subd}}", ConvertToSubdomain(chall.ChallName)) 
+		}
+
 		err := chall.validate()
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
@@ -132,13 +165,28 @@ func GetChalls(path string, noCache bool) []Challenge {
 				if isValidChallDir(full_chall_dir) {
 					chall := parseChallFile(filepath.Join(full_chall_dir, "chall.yaml"))
 					chall.ChallDir = full_chall_dir
+					
+					if isCustomChall(chall) {
+						chall.CustomDeploy = true
+			
+						yamlStr, err := os.ReadFile(filepath.Join(chall.ChallDir, "deployment.yaml"))
+						if err != nil {
+							logger.LogMessage("ERROR", fmt.Sprintf("cannot read deloyment.yaml file: %v", err), "Main")
+							continue
+						}
+			
+						chall.YamlStr = string(yamlStr)
+					}
+
 					err := chall.validate()
 					if err != nil {
 						logger.LogMessage("ERROR", fmt.Sprintf("error in challenge format: %v", err), "Validator")
+						continue
 					} else {
 						err := chall.GenerateCache(noCache)
 						if err != nil {
 							logger.LogMessage("WARN", fmt.Sprintf("couldn't generate cache for chall %s: %v", path, err), "Main")
+							continue
 						}
 						challs = append(challs, chall)
 					}
