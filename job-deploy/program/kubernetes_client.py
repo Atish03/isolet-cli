@@ -43,8 +43,10 @@ class KubeClient():
     
     def check_private(self) -> bool:
         try:
-            self.v1.read_namespaced_secret(name="dynamic-registry-secret", namespace="automation")
-            return True
+            config = self.v1.read_namespaced_config_map(name="automation-config", namespace="automation")
+            if config.data.get("DYNAMIC_REGISTRY_PRIVATE", "false") == "true":
+                return True
+            return False
         except Exception as e:
             return False
         
@@ -121,7 +123,7 @@ class KubeClient():
             entrypoints = [subd]
             
             if url:
-                routes_match = f"Host(`{url}`)"
+                routes_match = f"HostSNI(`{url}`)"
                 entrypoints = ["web", "websecure"]
             
             ingress_route_tcp = {
