@@ -9,9 +9,9 @@ import (
 	"github.com/Atish03/isolet-cli/logger"
 )
 
-func (chall *Challenge) Load(cli *client.CustomClient, namespace, registry string, wg *sync.WaitGroup) error {
+func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *sync.WaitGroup) error {
 	job_name := filepath.Base(filepath.Clean(chall.ChallDir))
-	registry = filepath.Clean(registry)
+	registry := cli.GetRegistry(chall.Type)
 
 	adminSecret, err := cli.GetAdminSecret()
 	if err != nil {
