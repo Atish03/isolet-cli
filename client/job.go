@@ -20,7 +20,7 @@ import (
 
 type JobPodEnv struct {
 	ChallType   string;
-	Registry    string;
+	Registry    *Registry;
 	AdminSecret string;
 	Public_URL  string;
 }
@@ -45,7 +45,6 @@ type DeployJob struct {
 
 func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 	var zeroPtr int32 = 0
-	dockerConfigMap := challjob.ClientSet.GetRegistrySecretName(challjob.Namespace, challjob.JobPodEnv.ChallType)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +79,7 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 								},
 								{
 									Name: "IMAGE_REGISTRY",
-									Value: challjob.JobPodEnv.Registry,
+									Value: challjob.JobPodEnv.Registry.URL,
 								},
 								{
 									Name: "ADMIN_SECRET",
@@ -117,12 +116,12 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 		},
 	}
 
-	if dockerConfigMap != nil {
+	if challjob.JobPodEnv.Registry.Private {
 		dockerCM := corev1.Volume{
 			Name:         "docker-config",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: *dockerConfigMap,
+					SecretName: challjob.JobPodEnv.Registry.Secret,
 				},
 			},
 		}

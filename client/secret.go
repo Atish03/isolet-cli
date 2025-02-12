@@ -3,9 +3,14 @@ package client
 import (
 	"context"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type Registry struct {
+	URL     string
+	Private bool
+	Secret  string
+}
 
 func (client *CustomClient) GetAdminSecret() (secret string, err error) {
 	item, err := client.CoreV1().Secrets("platform").Get(context.Background(), "platform-secrets", metav1.GetOptions{})
@@ -19,7 +24,7 @@ func (client *CustomClient) GetAdminSecret() (secret string, err error) {
 }
 
 func (client *CustomClient) GetPublicURL() (url string, err error) {
-	item, err := client.CoreV1().ConfigMaps("platform").Get(context.Background(), "api-config", metav1.GetOptions{})
+	item, err := client.CoreV1().ConfigMaps("automation").Get(context.Background(), "automation-config", metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -29,23 +34,28 @@ func (client *CustomClient) GetPublicURL() (url string, err error) {
 	return
 }
 
-func (client *CustomClient) GetRegistrySecretName(namespace, chall_type string) (*string) {
-	var cm *v1.Secret;
-	var err error;
-
-	if chall_type == "dynamic" {
-		cm, err = client.CoreV1().Secrets(namespace).Get(context.Background(), "dynamic-registry-secret", metav1.GetOptions{})
-		if err != nil {
-			return nil
-		}
-	} else if chall_type == "on-demand" {
-		cm, err = client.CoreV1().Secrets(namespace).Get(context.Background(), "isolet-registry-secret", metav1.GetOptions{})
-		if err != nil {
-			return nil
-		}
-	} else {
+func (client *CustomClient) GetRegistry(chall_type string) (*Registry) {
+	cm, err := client.CoreV1().ConfigMaps("automation").Get(context.Background(), "automation-config", metav1.GetOptions{})
+	if err != nil {
 		return nil
 	}
 
-	return &cm.Name
+	registry := Registry{}
+
+	if chall_type == "dynamic" {
+		registry.URL = cm.Data["DYNAMIC_IMAGE_REGISTRY"]
+		if cm.Data["DYNAMIC_REGISTRY_PRIVATE"] == "true" {
+			registry.Private = true
+			registry.Secret = "dynamic-registry-secret"
+		}
+		
+	} else if chall_type == "on-demand" {
+		registry.URL = cm.Data["ISOLET_IMAGE_REGISTRY"]
+		if cm.Data["ISOLET_REGISTRY_PRIVATE"] == "true" {
+			registry.Private = true
+			registry.Secret = "isolet-registry-secret"
+		}
+	}
+
+	return &registry
 }
