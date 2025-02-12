@@ -126,13 +126,9 @@ metadata:
 spec:
   entryPoints: # The entrypoints for http challenge will be web and websecure
   - {{.Subd}}
-  tls: # Only for http challenges
-    certResolver: default
   routes:
-  - match: HostSNI(`*`) # Make this Host(`subdomain.domain`) for http challenges
+  - match: HostSNI(`*`) # Make this HostSNI(`subdomain.domain`) for http challenges
     kind: Rule
-    middlewares: # Only for http challenges
-      - name: secure-headers
     services:
     - name: {{.Subd}}-svc
       port: 8008
