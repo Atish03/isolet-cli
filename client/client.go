@@ -8,17 +8,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
 	"path/filepath"
 )
-
-type CustomClient struct {
-	*kubernetes.Clientset
-	Config *rest.Config
-}
 
 func GetClient() (CustomClient) {
 	var kubeconfig string

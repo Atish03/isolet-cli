@@ -93,7 +93,7 @@ spec:
       - name: dynamic-registry-secret
       containers:
       - name: "container-1"
-        image: <registry/image-1>
+        image: {{.Registry}}/<img-dir-name>
         resources:
           limits:
             cpu: 500m

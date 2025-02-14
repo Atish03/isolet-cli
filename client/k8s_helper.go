@@ -6,12 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Registry struct {
-	URL     string
-	Private bool
-	Secret  string
-}
-
 func (client *CustomClient) GetAdminSecret() (secret string, err error) {
 	item, err := client.CoreV1().Secrets("platform").Get(context.Background(), "platform-secrets", metav1.GetOptions{})
 	if err != nil {

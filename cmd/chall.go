@@ -2,14 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/Atish03/isolet-cli/challenge"
 	"github.com/Atish03/isolet-cli/client"
 	"github.com/Atish03/isolet-cli/logger"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -18,45 +15,8 @@ var kubecli = client.GetClient()
 func init() {
 	loadCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable cache while loading")
 	deployCmd.Flags().BoolVar(&force, "force", false, "Force deploy a challenge")
-	challCmd.AddCommand(lsCmd, testCmd, loadCmd, deployCmd, undeployCmd)
+	challCmd.AddCommand(lsCmd, loadCmd, deployCmd, undeployCmd)
   	rootCmd.AddCommand(challCmd)
-}
-
-func drawChallTable(challs []challenge.Challenge) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Name", "Type", "Category", "Points", "Loaded on"})
-
-	data := make([][]string, len(challs))
-
-	for i, chall := range(challs) {
-		timestamp := chall.PrevCache.TimeStamp.Format("Mon Jan 2 15:04:05")
-		if chall.PrevCache.TimeStamp.IsZero() {
-			timestamp = "-"
-		}
-		data[i] = []string {chall.ChallName, chall.Type, chall.CategoryName, fmt.Sprintf("%d", chall.Points), timestamp}
-	}
-
-	for _, v := range data {
-		table.Append(v)
-	}
-	table.Render()
-}
-
-func loadChalls(challs []challenge.Challenge) {
-	var wg sync.WaitGroup
-	
-	for _, chall := range(challs) {
-		wg.Add(1)
-		
-		go func(){
-			err := chall.Load(&kubecli, "automation", &wg)
-			if err != nil {
-				logger.LogMessage("ERROR", fmt.Sprintf("error loading challenge: %v", err), "Main")
-			}
-		}()
-	}
-
-	wg.Wait()
 }
 
 var noCache bool
@@ -85,18 +45,8 @@ var lsCmd = &cobra.Command{
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
 		}
-		challs := challenge.GetChalls(challDir, false)
+		challs := challenge.GetChalls(challDir, false, &kubecli)
 		drawChallTable(challs)
-	},
-}
-
-var testCmd = &cobra.Command{
-	Use:   "test <chall_name>",
-	Short: "Test a specific challenge",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		challName := args[0]
-		fmt.Printf("Testing challenge: %s\n", challName)
 	},
 }
 
@@ -112,14 +62,15 @@ var loadCmd = &cobra.Command{
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
 		}
-		challs := challenge.GetChalls(challDir, noCache)
+		challs := challenge.GetChalls(challDir, noCache, &kubecli)
 		loadChalls(challs)
 	},
 }
 
 var deployCmd = &cobra.Command{
 	Use: "deploy <dir>",
-	Short: "Deploy challenges/challenge in a directory\nNOTE: This will only search for dynamic challenges since static and on-demand don't require manual deployment",
+	Short: "Deploy challenges/challenge in a directory",
+	Long: "NOTE: This will only search for dynamic challenges since static and on-demand don't require manual deployment",
 	Run: func(cmd *cobra.Command, args []string) {
 		dir := "."
 		if len(args) != 0 {
@@ -129,7 +80,7 @@ var deployCmd = &cobra.Command{
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
 		}
-		challs := challenge.GetChalls(challDir, noCache)
+		challs := challenge.GetChalls(challDir, noCache, &kubecli)
 		deployChalls(challs, force)
 	},
 }
@@ -146,7 +97,7 @@ var undeployCmd = &cobra.Command{
 		if err != nil {
 			logger.LogMessage("ERROR", fmt.Sprintf("invalid directory %s", dir), "Main")
 		}
-		challs := challenge.GetChalls(challDir, noCache)
+		challs := challenge.GetChalls(challDir, noCache, &kubecli)
 		deleteChalls(challs)
 	},
 }

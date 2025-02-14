@@ -8,19 +8,6 @@ import (
 	"time"
 )
 
-type ChallCache struct {
-	ChallHash  string            `json:"chall_hash"`
-	HintsHash   string            `json:"hints_hash"`
-	DockerHashs map[string]string `json:"docker_hash"`
-	ResHashs    map[string]string `json:"resources_hash"` 
-	TimeStamp   time.Time         `json:"push_time"`
-}
-
-type DirHash struct {
-	DirName string `json:"dir_name"`
-	Hash    string `json:"hash"`
-}
-
 func (chall *Challenge) GenerateCache(noCache bool) error {
 	if chall.Type != "static"{
 		dirs, err := os.ReadDir(filepath.Join(chall.ChallDir, "Dockerfiles"))
@@ -93,8 +80,9 @@ func (chall *Challenge) GenerateCache(noCache bool) error {
 		return fmt.Errorf("cannot hash challenge: %v", err)
 	}
 
-	chall.ChallCache.HintsHash   = hintsHash
-	chall.ChallCache.ChallHash   = challHash
+	chall.ChallCache.HintsHash = hintsHash
+	chall.ChallCache.ChallHash = challHash
+	chall.ChallCache.ChallName = chall.ChallName
 
 	prevCache := ChallCache{}
 

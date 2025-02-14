@@ -24,6 +24,19 @@ class Database():
         
         return rows[0][0]
     
+    def __change_chall_name(self) -> None:
+        query = """
+        UPDATE challenges
+        SET chall_name = %s
+        WHERE chall_name = %s
+        """
+        
+        old_name = self.config.get("old_name", "")
+        new_name = self.config.get("new_name", "")
+        if old_name != new_name:
+            self.cursor.execute(query, (new_name, old_name))
+            self.commit()
+    
     def __insert_chall(self, category_id: int) -> int:
         challenge_query = Template(self.config.get('chall_query')).substitute({'CATEGORY_ID': category_id})
     
@@ -70,6 +83,8 @@ class Database():
             self.cursor.execute(delete_query)
     
     def update_all(self) -> int:
+        self.__change_chall_name()
+        
         category_id = self.__insert_category()
         chall_id = self.__insert_chall(category_id)
         hids = self.__insert_hints(chall_id)

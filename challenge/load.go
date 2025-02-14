@@ -11,7 +11,6 @@ import (
 
 func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *sync.WaitGroup) error {
 	job_name := filepath.Base(filepath.Clean(chall.ChallDir))
-	registry := cli.GetRegistry(chall.Type)
 
 	adminSecret, err := cli.GetAdminSecret()
 	if err != nil {
@@ -26,10 +25,10 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 	job := client.ChallJob {
 		Namespace: namespace,
 		JobName:   job_name,
-		JobImage:  "b3gul4/isolet-challenge-load:v0.1.1",
+		JobImage:  "b3gul4/isolet-challenge-load:v0.1.5",
 		JobPodEnv: client.JobPodEnv {
 			ChallType:   chall.Type,
-			Registry:    registry,
+			Registry:    chall.Registry,
 			AdminSecret: adminSecret,
 			Public_URL:  publicURL,
 		},
@@ -46,6 +45,13 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 	configMap, err := cli.CreateConfigMap(job_name, namespace, export, "config.json")
 	if err != nil {
 		return fmt.Errorf("cannot create config map: %v", err)
+	}
+
+	if chall.CustomDeploy.Custom {
+		_, err := cli.CreateConfigMap(job_name, "deployments", chall.CustomDeploy.Deployment, "deployment.yaml")
+		if err != nil {
+			return fmt.Errorf("cannot create deployment config map for custom deployment %s", chall.ChallDir)
+		}
 	}
 
 	jobDesc, err := job.StartJob()

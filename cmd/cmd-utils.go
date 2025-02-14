@@ -4,47 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/Atish03/isolet-cli/challenge"
 	"github.com/Atish03/isolet-cli/logger"
+	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
-
-type DynChall struct {
-	ChallName string `json:"chall_name"`
-	Custom    bool   `json:"custom"`
-	YamlStr   string `json:"yaml_string"`
-}
-
-type ChallsJson struct {
-	Challs []DynChall `json:"challs"`
-}
-
-type TraefikConfig struct {
-	API struct {
-		Insecure bool `yaml:"insecure"`
-	} `yaml:"api"`
-	EntryPoints map[string]struct {
-		Address string `yaml:"address"`
-	} `yaml:"entryPoints"`
-	Providers struct {
-		KubernetesCRD struct {
-			Namespaces []string `yaml:"namespaces"`
-		} `yaml:"kubernetesCRD"`
-	} `yaml:"providers"`
-}
-
-var TRAEFIK_NS   string = "traefik"
-var TRAEFIK_SVC  string = "traefik-lb"
-var TRAEFIK_DEP  string = "traefik"
-var TRAEFIK_CONF string = "traefik-config"
 
 func compareMaps(map1, map2 map[string]string) bool {
 	if len(map1) != len(map2) {
@@ -83,8 +56,8 @@ func deployChalls(challs []challenge.Challenge, force bool) {
 			if !isChallChanged(chall) || force {
 				chall_names = append(chall_names, DynChall{
 					ChallName: chall.ChallName,
-					Custom: chall.CustomDeploy,
-					YamlStr: chall.YamlStr,
+					Custom: chall.CustomDeploy.Custom,
+					ConfigMap: challenge.ConvertToSubdomain(chall.ChallName),
 				})
 			}
 		}
@@ -246,4 +219,41 @@ func deleteChalls(challs []challenge.Challenge) {
 	if err != nil {
 		logger.LogMessage("ERROR", fmt.Sprintf("cannot restart traefik deployment: %v", err), "Main")
 	}
+}
+
+func drawChallTable(challs []challenge.Challenge) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Name", "Type", "Category", "Points", "Loaded on"})
+
+	data := make([][]string, len(challs))
+
+	for i, chall := range(challs) {
+		timestamp := chall.PrevCache.TimeStamp.Format("Mon Jan 2 15:04:05")
+		if chall.PrevCache.TimeStamp.IsZero() {
+			timestamp = "-"
+		}
+		data[i] = []string {chall.ChallName, chall.Type, chall.CategoryName, fmt.Sprintf("%d", chall.Points), timestamp}
+	}
+
+	for _, v := range data {
+		table.Append(v)
+	}
+	table.Render()
+}
+
+func loadChalls(challs []challenge.Challenge) {
+	var wg sync.WaitGroup
+	
+	for _, chall := range(challs) {
+		wg.Add(1)
+		
+		go func(){
+			err := chall.Load(&kubecli, "automation", &wg)
+			if err != nil {
+				logger.LogMessage("ERROR", fmt.Sprintf("error loading challenge: %v", err), "Main")
+			}
+		}()
+	}
+
+	wg.Wait()
 }
