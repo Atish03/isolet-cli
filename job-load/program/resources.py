@@ -29,8 +29,8 @@ class Resources:
         
         res = requests.post(URL, headers=headers, files=files)
         
-        if res.status_code == 200 or res.status_code == 409:
-            return res.text
+        if res.status_code == 200 or res.status_code == 409 or res.status_code == 201:
+            return os.path.join("https://", self.public_url, res.text)
         else:
             print("Not uploaded:", res.content.decode())
             return None

@@ -91,28 +91,6 @@ class Database():
         
         return chall_id
         
-    def update_images_table(self, chall_id: int, image_name: str) -> None:
-        query = """
-        INSERT INTO images
-        (chall_id, image, deployment, port, subd, cpu, mem)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (chall_id)
-        DO UPDATE SET
-            image = EXCLUDED.image,
-            deployment = EXCLUDED.deployment,
-            port = EXCLUDED.port,
-            subd = EXCLUDED.subd,
-            cpu = EXCLUDED.cpu,
-            mem = EXCLUDED.mem
-        """
-        
-        self.cursor.execute(query, (chall_id, image_name,
-                                    self.config["deployment_metadata"]["deployment_type"],
-                                    self.config["deployment_metadata"]["deployment_port"],
-                                    self.config["deployment_metadata"]["subdomain"],
-                                    self.config["deployment_metadata"]["cpu"],
-                                    self.config["deployment_metadata"]["mem"]))
-        
     def update_links(self, chall_id: int, links: list) -> None:
         query = """
         UPDATE challenges

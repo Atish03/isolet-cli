@@ -26,11 +26,10 @@ class KubeClient():
             db_config["dbname"] = base64.b64decode(decoded_data["POSTGRES_DATABASE"]).decode()
             db_config["user"] = base64.b64decode(decoded_data["POSTGRES_USER"]).decode()
             db_config["password"] = base64.b64decode(decoded_data["POSTGRES_PASSWORD"]).decode()
-            db_config["host"] = f'{base64.b64decode(decoded_data["POSTGRES_HOST"]).decode()}.platform.svc.cluster.local'
+            db_config["host"] = base64.b64decode(decoded_data["POSTGRES_HOST"]).decode()
         except Exception as e:
             print(f"Error reading Secret: {e}")
             exit(1)
-            return None
         
         return db_config
     
@@ -43,4 +42,3 @@ class KubeClient():
         except Exception as e:
             print(f"Error reading Secret: {e}")
             exit(1)
-            return None

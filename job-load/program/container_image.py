@@ -4,8 +4,14 @@ from pathlib import Path
 
 class ContainerImage():
     def __init__(self) -> None:
+        self.config = None
+        with open("/config/config.json", "r") as f:
+            self.config = json.loads(f.read())
+            
+        deployment_config = self.config["deployment_config"]
+        
         self.chall_type = os.environ.get("CHALL_TYPE")
-        self.registry = os.environ.get("IMAGE_REGISTRY")
+        self.registry = deployment_config["registry"]["url"]
     
     def __build_image(self, image_name: str) -> None:
         try:
@@ -64,9 +70,13 @@ class ContainerImage():
                 for image_name in images:
                     self.__build_image(image_name)
                     self.__push_image(image_name)
+            
+            if self.chall_type != "static":
+                images_dir = os.listdir("/chall/Dockerfiles")
+                
+                for image_name in images_dir:
                     images_list.append(f"{self.registry}/{image_name}:latest")
 
-            print("Done!")
             return images_list
         except Exception as e:
             print(e)

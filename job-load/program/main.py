@@ -2,7 +2,7 @@ import os, time
 import kubernetes_client
 import subprocess
 import json
-import container_image, database, resources
+import container_image, database, resources, deployment
 import traceback
 
 MAX_WAIT = 150 # approx 5 mins
@@ -32,16 +32,17 @@ if __name__ == "__main__":
     wait_until_copying(source_dir, lock_file)
     
     try:
+        yaml_creator = deployment.Deployment()
         image_worker = container_image.ContainerImage()
         phoros_worker = resources.Resources()
         db = database.Database()
         
         image_names = image_worker.build_and_push_images()
         urls = phoros_worker.upload()
-        chall_id = db.update_all()
         
-        if len(image_names) == 1:
-            db.update_images_table(chall_id, image_names[0])
+        yaml_creator.create(image_names)
+        
+        chall_id = db.update_all()
         
         db.update_links(chall_id, urls)
          
