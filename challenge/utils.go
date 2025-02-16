@@ -146,7 +146,7 @@ func parseChallFile(filename string) (chall Challenge) {
 	return
 }
 
-func (exp *ExportStruct) updateChanges(chall *Challenge) error {
+func (exp *ExportStruct) updateChanges(chall *Challenge) {
 	cache := chall.PrevCache
 
 	newDockerHashes := chall.ChallCache.DockerHashs
@@ -181,6 +181,20 @@ func (exp *ExportStruct) updateChanges(chall *Challenge) error {
 
 	exp.DockerChanged = dockersToBuild
 	exp.ResChanged = resToUpload
+}
 
-	return nil
+func (exp *ExportStruct) populateResources(chall *Challenge) {
+	exp.DepConfig.Resources.CPULimit = "300m"
+	exp.DepConfig.Resources.MemLimit = "256Mi"
+
+	exp.DepConfig.Resources.CPUReq = chall.CPU
+	exp.DepConfig.Resources.MemReq = chall.Memory
+
+	if exp.DepConfig.Resources.CPUReq == "" {
+		exp.DepConfig.Resources.CPUReq = "100m"
+	}
+
+	if exp.DepConfig.Resources.MemReq == "" {
+		exp.DepConfig.Resources.MemReq = "64Mi"
+	}
 }

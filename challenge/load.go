@@ -1,6 +1,7 @@
 package challenge
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -25,7 +26,7 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 	job := client.ChallJob {
 		Namespace: namespace,
 		JobName:   job_name,
-		JobImage:  "b3gul4/isolet-challenge-load:v0.1.5",
+		JobImage:  "b3gul4/isolet-challenge-load:v0.1.0",
 		JobPodEnv: client.JobPodEnv {
 			ChallType:   chall.Type,
 			Registry:    chall.Registry,
@@ -37,12 +38,17 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 		ClientSet: cli,
 	}
 
-	export, err := chall.GetExportStruct()
+	exp, err := chall.GetExportStruct()
 	if err != nil {
 		return fmt.Errorf("cannot get export data: %v", err)
 	}
 
-	configMap, err := cli.CreateConfigMap(job_name, namespace, export, "config.json")
+	expjson, err := json.Marshal(exp)
+	if err != nil {
+		return fmt.Errorf("cannot marshal export data: %v", err)
+	}
+
+	configMap, err := cli.CreateConfigMap(job_name, namespace, string(expjson), "config.json")
 	if err != nil {
 		return fmt.Errorf("cannot create config map: %v", err)
 	}

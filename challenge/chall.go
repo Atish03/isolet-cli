@@ -1,7 +1,6 @@
 package challenge
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,9 +73,7 @@ func GetChalls(path string, noCache bool, cli *client.CustomClient) []Challenge 
 	return challs
 }
 
-func (c *Challenge) GetExportStruct() (expString string, err error) {
-	exp := &ExportStruct{}
-
+func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 	filesJSON := formatArray(c.Files)
 	tagsJSON := formatArray(c.Tags)
 	linksJSON := formatArray(c.Links)
@@ -149,23 +146,15 @@ func (c *Challenge) GetExportStruct() (expString string, err error) {
 	exp.HintsQuery = hintQuery
 
 	exp.updateChanges(c)
+	exp.populateResources(c)
 
-	exp.DepMeta.DepType = c.DepType
-	exp.DepMeta.DepPort = c.DepPort
+	exp.DepConfig.DepType = c.DepType
+	exp.DepConfig.DepPort = c.DepPort
 
-	if c.CPU != 0 {
-		exp.DepMeta.CPU = c.CPU
-	} else {
-		exp.DepMeta.CPU = 15
-	}
+	exp.DepConfig.Subdomain = ConvertToSubdomain(c.ChallName)
 
-	if c.Memory != 0 {
-		exp.DepMeta.Memory = c.Memory
-	} else {
-		exp.DepMeta.Memory = 32
-	}
-
-	exp.DepMeta.Subdomain = ConvertToSubdomain(c.ChallName)
+	exp.DepConfig.CustomDeploy = c.CustomDeploy
+	exp.DepConfig.Registry = *c.Registry
 
 	exp.OldName = c.PrevCache.ChallName
 	if exp.OldName == "" {
@@ -173,12 +162,5 @@ func (c *Challenge) GetExportStruct() (expString string, err error) {
 	}
 	exp.NewName = c.ChallCache.ChallName
 
-	expjson, err := json.Marshal(exp)
-	if err != nil {
-		return "", fmt.Errorf("cannot marshal export data: %v", err)
-	}
-
-	expString = string(expjson)
-
-	return
+	return exp, nil
 }
