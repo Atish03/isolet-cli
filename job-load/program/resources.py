@@ -29,8 +29,8 @@ class Resources:
         
         res = requests.post(URL, headers=headers, files=files)
         
-        if res.status_code == 200 or res.status_code == 409 or res.status_code == 201:
-            return os.path.join("https://", self.public_url, res.text)
+        if res.status_code == 200:
+            return os.path.join("https://", self.public_url, res.text.strip("/"))
         else:
             print("Not uploaded:", res.content.decode())
             return None
@@ -49,7 +49,6 @@ class Resources:
             file_path = os.path.join("/chall/resources/", f)
             upload_path = self.__upload(file_path)
             if upload_path:
-                public_url = urljoin(self.public_url, upload_path)
-                public_urls.append(public_url)
+                public_urls.append(upload_path)
         
         return public_urls
