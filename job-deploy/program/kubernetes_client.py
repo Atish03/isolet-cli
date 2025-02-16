@@ -12,10 +12,8 @@ class KubeClient():
             config.load_kube_config()
             
         self.v1 = client.CoreV1Api()
-        self.app = client.AppsV1Api()
         self.api = client.ApiClient()
         self.custom_api = client.CustomObjectsApi()
-        self.DOMAIN = os.environ.get("DOMAIN_NAME", "localhost")
         
     def get_db_config(self) -> dict:
         db_config = {
@@ -33,7 +31,7 @@ class KubeClient():
             db_config["dbname"] = base64.b64decode(decoded_data["POSTGRES_DATABASE"]).decode()
             db_config["user"] = base64.b64decode(decoded_data["POSTGRES_USER"]).decode()
             db_config["password"] = base64.b64decode(decoded_data["POSTGRES_PASSWORD"]).decode()
-            db_config["host"] = f'{base64.b64decode(decoded_data["POSTGRES_HOST"]).decode()}.platform.svc.cluster.local'
+            db_config["host"] = base64.b64decode(decoded_data["POSTGRES_HOST"]).decode()
         except Exception as e:
             print(f"Error reading Secret: {e}")
             exit(1)
@@ -41,162 +39,46 @@ class KubeClient():
         
         return db_config
     
-    def check_private(self) -> bool:
+    def __get_deployment(self, subd: str) -> str:
         try:
-            config = self.v1.read_namespaced_config_map(name="automation-config", namespace="automation")
-            if config.data.get("DYNAMIC_REGISTRY_PRIVATE", "false") == "true":
-                return True
-            return False
+            cm = self.v1.read_namespaced_config_map(name=f"{subd}-cm", namespace="store")
+            return cm.data["deployment.yaml"]
         except Exception as e:
-            return False
+            print("cannot read deployment.yaml,", e)
+            exit(1)
         
-    def __deploy_pods(self, subd: str, image: str, port: int, private: bool) -> None:
-        try:
-            deployment = client.V1Deployment(
-                api_version="apps/v1",
-                kind="Deployment",
-                metadata=client.V1ObjectMeta(
-                    name=subd,
-                    namespace="dynamic"
-                ),
-                spec=client.V1DeploymentSpec(
-                    replicas=1,
-                    selector=client.V1LabelSelector(
-                        match_labels={"app": subd}
-                    ),
-                    template=client.V1PodTemplateSpec(
-                        metadata=client.V1ObjectMeta(labels={"app": subd}),
-                        spec=client.V1PodSpec(
-                            containers=[
-                                client.V1Container(
-                                    name=subd,
-                                    image=image,
-                                    ports=[client.V1ContainerPort(container_port=port)]
-                                )
-                            ]
-                        )
-                    )
-                )
-            )
-            
-            if private:
-                deployment.spec.template.spec.image_pull_secrets = [client.V1LocalObjectReference(name="dynamic-registry-secret")]
-                
-            self.app.create_namespaced_deployment(namespace="dynamic", body=deployment)
-            
-        except Exception as e:
-            print(e)
-            
-    def __start_svc(self, subd: str, port: int) -> None:
-        try:
-            service = client.V1Service(
-                api_version="v1",
-                kind="Service",
-                metadata=client.V1ObjectMeta(
-                    name=f"{subd}-svc",
-                    namespace="dynamic",
-                    annotations={
-                        "traefik.ingress.kubernetes.io/router.entrypoints": subd
-                    }
-                ),
-                spec=client.V1ServiceSpec(
-                    selector={"app": subd},
-                    ports=[
-                        client.V1ServicePort(
-                            protocol="TCP",
-                            port=8008,
-                            target_port=port
-                        )
-                    ],
-                    type="ClusterIP"
-                )
-            )
-            
-            self.v1.create_namespaced_service(namespace="dynamic", body=service)
-            
-        except Exception as e:
-            print(e)
-            
-    def __define_ingress(self, subd: str, url: str=None) -> None:
-        try:
-            routes_match = "HostSNI(`*`)"
-            entrypoints = [subd]
-            
-            if url:
-                routes_match = f"HostSNI(`{url}`)"
-                entrypoints = ["web", "websecure"]
-            
-            ingress_route_tcp = {
-                "apiVersion": "traefik.io/v1alpha1",
-                "kind": "IngressRouteTCP",
-                "metadata": {
-                    "name": f"{subd}-ingress",
-                    "namespace": "dynamic"
-                },
-                "spec": {
-                    "entryPoints": entrypoints,
-                    "routes": [
-                        {
-                            "match": routes_match,
-                            "kind": "Rule",
-                            "services": [
-                                {
-                                    "name": f"{subd}-svc",
-                                    "port": 8008
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-            
-            # if url:
-            #     ingress_route_tcp["spec"]["routes"][0]["middlewares"] = [{"name": "secure-headers"}]
+    def apply(self, subd: str, p: Patch) -> None:
+        try:    
+            yaml_objects = list(yaml.safe_load_all(self.__get_deployment(subd)))
             
             group = "traefik.io"
             version = "v1alpha1"
-            plural = "ingressroutetcps"
-            
-            self.custom_api.create_namespaced_custom_object(
-                group=group,
-                version=version,
-                namespace="dynamic",
-                plural=plural,
-                body=ingress_route_tcp
-            )
-        
-        except Exception as e:
-            print(e)
-            
-    def expose_chall(self, subd: str, image: str, port: int, private: bool) -> None:
-        url = None
-        if port == 80:
-            url = f"{subd}.ctf.{self.DOMAIN}"
-        
-        self.__deploy_pods(subd, image, port, private)
-        self.__start_svc(subd, port)
-        self.__define_ingress(subd, url)
-        
-    def apply(self, chall: dict, p: Patch) -> None:        
-        yaml_objects = list(yaml.safe_load_all(chall["yaml_string"]))
-        
-        group = "traefik.io"
-        version = "v1alpha1"
-        namespace = "dynamic"
-        plural = "ingressroutetcps"
+            namespace = "dynamic"
 
-        for yaml_obj in yaml_objects[:-1]:
-            utils.create_from_dict(self.api, yaml_obj, namespace=namespace)
-
-        api = client.CustomObjectsApi()
-        api.create_namespaced_custom_object(
-            group=group,
-            version=version,
-            namespace=namespace,
-            plural=plural,
-            body=yaml_objects[-1],
-        )
+            for yaml_obj in yaml_objects:
+                if yaml_obj["kind"] == "IngressRoute" or yaml_obj["kind"] == "IngressRouteTCP":
+                    if yaml_obj["kind"] == "IngressRoute":
+                        plural = "ingressroutes"
+                    else:
+                        plural = "ingressroutetcps"
+                    self.custom_api.create_namespaced_custom_object(
+                        group=group,
+                        version=version,
+                        namespace=namespace,
+                        plural=plural,
+                        body=yaml_objects[-1],
+                    )
+                else:
+                    utils.create_from_dict(self.api, yaml_obj, namespace=namespace)
         
-        if chall["deployment"] != "http":
-            p.add_port_to_service(f"{yaml_objects[-1]['spec']['entryPoints'][0]}-port", chall["port"])
-            p.add_entrypoint(yaml_objects[-1]['spec']['entryPoints'][0], f":{chall['port']}")
+        except utils.FailToCreateError as e:
+            exceptions = e.api_exceptions
+            
+            for exception in exceptions:
+                body = json.loads(exception.body)
+                if body.get("code") == 409:
+                    print(f"{body.get('message')}, please undeploy first.")
+                else:
+                    print("error when applying:", e)
+                    
+            exit(1)

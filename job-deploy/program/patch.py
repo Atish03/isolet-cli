@@ -9,9 +9,9 @@ class Patch:
         self.api = client.AppsV1Api()
         
         self.TRAEFIK_CONFIG     = "traefik-config"
-        self.TRAEFIK_SERVICE    = "traefik-lb"
+        self.TRAEFIK_SERVICE    = "traefik-svc"
         self.TRAEFIK_NAMESPACE  = "traefik"
-        self.TRAEFIK_DEPLOYMENT = "traefik"
+        self.TRAEFIK_DEPLOYMENT = "traefik-deployment"
         
         # ======================= ENTRYPOINTS CONFIGMAP =======================
         self.configmap = self.v1.read_namespaced_config_map(name=self.TRAEFIK_CONFIG, namespace=self.TRAEFIK_NAMESPACE)
