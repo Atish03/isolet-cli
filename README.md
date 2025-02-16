@@ -73,7 +73,7 @@ One can use `deployment.yaml` to define their deployment and run `chall deploy`
 
 Following is a template for `deployment.yaml`:
 ```yaml
-# DO NOT CHANGE ANYTHING, JUST ADD CONTAINERS, CHANGE PORTS AND EDIT INGRESS SPECS
+# DO NOT CHANGE ANYTHING EXCEPT WHEREVER COMMENTS ARE PRESENT AND ADD CONTAINERS
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -89,49 +89,55 @@ spec:
       labels:
         app: {{.Subd}}
     spec:
-      imagePullSecrets:
-      - name: dynamic-registry-secret
       containers:
-      - name: "container-1"
-        image: {{.Registry}}/<img-dir-name>
+      - image: {{.Registry}}/<image-dir-name> # put the name of directory your required image's Dockerfile is in
+        name: {{.Subd}}
+        ports:
+        - containerPort: 80 # 22 for ssh, 6969 for nc
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 300m
+            memory: 256Mi
           requests:
-            cpu: 72m
-            memory: 128Mi
-        ports:
-        - containerPort: 22 # The port of container you want to expose
+            cpu: 100m
+            memory: 64Mi
+      imagePullSecrets:
+      - name: challenge-registry-secret
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{.Subd}}
   name: {{.Subd}}-svc
   namespace: dynamic
-annotations:
-  "traefik.ingress.kubernetes.io/router.entrypoints": {{.Subd}}
 spec:
-  selector:
-    app: {{.Subd}}
   ports:
   - port: 8008
-    targetPort: 22 # Change this to containerPort
+    protocol: TCP
+    targetPort: 80 # same as containerPort
+  selector:
+    app: {{.Subd}}
+  type: ClusterIP
 ---
 apiVersion: traefik.io/v1alpha1
-kind: IngressRouteTCP
+kind: IngressRoute
 metadata:
   name: {{.Subd}}-ingress
   namespace: dynamic
 spec:
-  entryPoints: # The entrypoints for http challenge will be web and websecure
-  - {{.Subd}}
+  entryPoints:
+  - {{.Subd}} # only for nc/ssh challs
+  - web # only for http challs
+  - websecure # only for http challs
   routes:
-  - match: HostSNI(`*`) # Make this HostSNI(`subdomain.domain`) for http challenges
-    kind: Rule
+  - kind: Rule
+    match: Host(`subdomain.domain.tld`) # use HostSNI(`*`) for nc/ssh challs
     services:
     - name: {{.Subd}}-svc
       port: 8008
+  tls: # only for http challs
+    secretName: challenge-certs
 ```
 
 ## Installation
