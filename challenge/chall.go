@@ -13,10 +13,12 @@ import (
 func GetChalls(path string, noCache bool, cli *client.CustomClient) []Challenge {
 	var challs []Challenge
 
+	registry := cli.GetRegistry()
+
 	if isValidChallDir(path) {
 		chall := parseChallFile(filepath.Join(path, "chall.yaml"))
 		chall.ChallDir = path
-		chall.Registry = cli.GetRegistry(chall.Type)
+		chall.Registry = registry
 
 		err := chall.handleCustomChall()
 		if err != nil {
@@ -46,7 +48,7 @@ func GetChalls(path string, noCache bool, cli *client.CustomClient) []Challenge 
 				if isValidChallDir(full_chall_dir) {
 					chall := parseChallFile(filepath.Join(full_chall_dir, "chall.yaml"))
 					chall.ChallDir = full_chall_dir
-					chall.Registry = cli.GetRegistry(chall.Type)
+					chall.Registry = registry
 					
 					err := chall.handleCustomChall()
 					if err != nil {

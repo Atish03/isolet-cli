@@ -28,7 +28,7 @@ func (client *CustomClient) GetPublicURL() (url string, err error) {
 	return
 }
 
-func (client *CustomClient) GetRegistry(chall_type string) (*Registry) {
+func (client *CustomClient) GetRegistry() (*Registry) {
 	cm, err := client.CoreV1().ConfigMaps("automation").Get(context.Background(), "automation-config", metav1.GetOptions{})
 	if err != nil {
 		return nil
