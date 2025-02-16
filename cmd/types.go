@@ -1,9 +1,12 @@
 package cmd
 
+import "github.com/Atish03/isolet-cli/challenge"
+
 type DynChall struct {
-	ChallName string `json:"chall_name"`
-	Custom    bool   `json:"custom"`
-	ConfigMap string `json:"config_map"`
+	ChallName string              `json:"chall_name"`
+	Custom    bool                `json:"custom"`
+	ConfigMap string              `json:"config_map"`
+	DepConfig challenge.DepConfig `json:"deployment_config"`
 }
 
 type ChallsJson struct {
@@ -25,6 +28,6 @@ type TraefikConfig struct {
 }
 
 var TRAEFIK_NS   string = "traefik"
-var TRAEFIK_SVC  string = "traefik-lb"
-var TRAEFIK_DEP  string = "traefik"
+var TRAEFIK_SVC  string = "traefik-svc"
+var TRAEFIK_DEP  string = "traefik-deployment"
 var TRAEFIK_CONF string = "traefik-config"

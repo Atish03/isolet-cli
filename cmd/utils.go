@@ -54,10 +54,16 @@ func deployChalls(challs []challenge.Challenge, force bool) {
 	for _, chall := range(challs) {
 		if chall.Type == "dynamic" {
 			if !isChallChanged(chall) || force {
+				expStruct, err := chall.GetExportStruct()
+				if err != nil {
+					logger.LogMessage("ERROR", fmt.Sprintf("cannot get export data for %s: %v", chall.ChallDir, err), "Main")
+				}
+
 				chall_names = append(chall_names, DynChall{
 					ChallName: chall.ChallName,
 					Custom: chall.CustomDeploy.Custom,
-					ConfigMap: challenge.ConvertToSubdomain(chall.ChallName),
+					ConfigMap: fmt.Sprintf("%s-cm", challenge.ConvertToSubdomain(chall.ChallName)),
+					DepConfig: expStruct.DepConfig,
 				})
 			}
 		}
@@ -72,7 +78,7 @@ func deployChalls(challs []challenge.Challenge, force bool) {
 
 	jsonBytes, err := json.Marshal(exp)
 	if err != nil {
-		logger.LogMessage("error", fmt.Sprintf("cannot marshal json: %v", err), "Main")
+		logger.LogMessage("ERROR", fmt.Sprintf("cannot marshal json: %v", err), "Main")
 	}
 
 	var wg sync.WaitGroup
@@ -186,6 +192,10 @@ func deleteChalls(challs []challenge.Challenge) {
 				Version:  "v1alpha1",
 				Resource: "ingressroutetcps",
 			}
+
+			if chall.DepType == "http" {
+				gvr.Resource = "ingressroutes"
+			}
 		
 			dynamicClient, err := dynamic.NewForConfig(kubecli.Config)
 			if err != nil {
@@ -256,4 +266,8 @@ func loadChalls(challs []challenge.Challenge) {
 	}
 
 	wg.Wait()
+}
+
+func configCLI(registry string) error {
+	return nil
 }
