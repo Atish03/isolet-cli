@@ -67,6 +67,10 @@ func (c *Challenge) validate() error {
 		c.Visible = false
 	}
 
+	if c.Type != "on-demand" && c.Type != "static" && c.Type != "dynamic" {
+		return fmt.Errorf("%s: challenge type can be one of ('on-demand', 'dynamic', 'static')", c.ChallDir)
+	}
+
 	resourceNotFound := []string{}
 
 	for _, resource := range(c.Files) {
@@ -99,9 +103,9 @@ func (c *Challenge) validate() error {
 		}
 	}
 
-	if c.Type == "dynamic" {
+	if c.Type != "static" {
 		if c.DepPort == 0 || c.DepType == "" {
-			return fmt.Errorf("%s: challenge type was dynamic but the deployment type and port were not mentioned", c.ChallDir)
+			return fmt.Errorf("%s: challenge type was %s but the deployment type and/or port were not mentioned", c.ChallDir, c.Type)
 		}
 
 		if c.DepType != "http" && c.DepType != "nc" && c.DepType != "ssh" {
