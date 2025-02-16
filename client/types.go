@@ -36,7 +36,7 @@ type DeployJob struct {
 }
 
 type Registry struct {
-	URL     string
-	Private bool
-	Secret  string
+	URL     string `json:"url"`
+	Private bool   `json:"private"` 
+	Secret  string `json:"secret"`
 }

@@ -36,20 +36,12 @@ func (client *CustomClient) GetRegistry(chall_type string) (*Registry) {
 
 	registry := Registry{}
 
-	if chall_type == "dynamic" {
-		registry.URL = cm.Data["DYNAMIC_IMAGE_REGISTRY"]
-		if cm.Data["DYNAMIC_REGISTRY_PRIVATE"] == "true" {
-			registry.Private = true
-			registry.Secret = "dynamic-registry-secret"
-		}
-		
-	} else if chall_type == "on-demand" {
-		registry.URL = cm.Data["ISOLET_IMAGE_REGISTRY"]
-		if cm.Data["ISOLET_REGISTRY_PRIVATE"] == "true" {
-			registry.Private = true
-			registry.Secret = "isolet-registry-secret"
-		}
+	if cm.Data["CHALLENGE_REGISTRY_PRIVATE"] == "true" {
+		registry.Private = true
+		registry.Secret = "challenge-registry-secret"
 	}
+
+	registry.URL = cm.Data["CHALLENGE_REGISTRY"]
 
 	return &registry
 }

@@ -27,7 +27,7 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					ServiceAccountName: "cli-service-account",
+					ServiceAccountName: "deployment-service-account",
 					Containers: []corev1.Container{
 						{
 							Name:    "job-container",
@@ -45,10 +45,6 @@ func (challjob *ChallJob) StartJob() (*batchv1.Job, error) {
 								{
 									Name: "CHALL_TYPE",
 									Value: challjob.JobPodEnv.ChallType,
-								},
-								{
-									Name: "IMAGE_REGISTRY",
-									Value: challjob.JobPodEnv.Registry.URL,
 								},
 								{
 									Name: "ADMIN_SECRET",
@@ -131,18 +127,12 @@ func (deployjob *DeployJob) StartJob() (*batchv1.Job, error) {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					ServiceAccountName: "deploy-sa",
+					ServiceAccountName: "deployment-service-account",
 					Containers: []corev1.Container{
 						{
 							Name:    "job-container",
 							Image:   deployjob.JobImage,
 							ImagePullPolicy: corev1.PullAlways,
-							Env: 	 []corev1.EnvVar{
-								{
-									Name: "DOMAIN_NAME",
-									Value: deployjob.Domain,
-								},
-							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "challs-vol",
