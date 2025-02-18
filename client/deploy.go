@@ -30,7 +30,7 @@ func (client *CustomClient) Deploy(namespace string, challs string, wg *sync.Wai
 	deployJob := DeployJob {
 		Namespace: namespace,
 		JobName:   job_name,
-		JobImage:  "b3gul4/isolet-dynamic-deploy:v0.1.0",
+		JobImage:  "b3gul4/isolet-dynamic-deploy:latest",
 		Domain:    domain,
 		ClientSet: client,
 	}
