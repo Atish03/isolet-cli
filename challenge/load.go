@@ -26,7 +26,7 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 	job := client.ChallJob {
 		Namespace: namespace,
 		JobName:   job_name,
-		JobImage:  "b3gul4/isolet-challenge-load:v0.1.0",
+		JobImage:  "b3gul4/isolet-challenge-load:latest",
 		JobPodEnv: client.JobPodEnv {
 			ChallType:   chall.Type,
 			Registry:    chall.Registry,

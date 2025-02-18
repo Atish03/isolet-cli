@@ -43,6 +43,7 @@ type Challenge struct {
 	DepPort      int      `yaml:"deployment_port,omitempty"`
 	CPU          string   `yaml:"cpu,omitempty"`
 	Memory       string   `yaml:"mem,omitempty"`
+	Attempts	 int	  `yaml:"attempts,omitempty"`
 	ChallDir     string
 	CustomDeploy CustomDeploy
 	Registry     *client.Registry

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/Atish03/isolet-cli/logger"
@@ -66,6 +67,9 @@ func (c *Challenge) validate() error {
 	if !c.Visible {
 		c.Visible = false
 	}
+	if c.Attempts == 0 {
+		c.Attempts = 500
+	}
 
 	if c.Type != "on-demand" && c.Type != "static" && c.Type != "dynamic" {
 		return fmt.Errorf("%s: challenge type can be one of ('on-demand', 'dynamic', 'static')", c.ChallDir)
@@ -76,6 +80,24 @@ func (c *Challenge) validate() error {
 	for _, resource := range(c.Files) {
 		if _, err := os.Stat(filepath.Join(c.ChallDir, "resources", resource)); err != nil {
 			resourceNotFound = append(resourceNotFound, resource)
+		}
+	}
+
+	if len(c.Files) != 0 {
+		extraResources := []string{}
+		resInDir, err := os.ReadDir(filepath.Join(c.ChallDir, "resources"))
+		if err != nil {
+			return fmt.Errorf("%s: cannot find resources directory", c.ChallDir)
+		}
+
+		for _, e := range(resInDir) {
+			if !slices.Contains(c.Files, e.Name()) {
+				extraResources = append(extraResources, e.Name())
+			}
+		}
+
+		if len(extraResources) != 0 {
+			return fmt.Errorf("%s: some extra resources were found in resources directory, please add them to files or delete them: (%s)", c.ChallDir, strings.Join(extraResources, ", "))
 		}
 	}
 
@@ -104,13 +126,20 @@ func (c *Challenge) validate() error {
 	}
 
 	if c.Type != "static" {
-		if c.DepPort == 0 || c.DepType == "" {
+		if c.DepType == "" {
 			return fmt.Errorf("%s: challenge type was %s but the deployment type and/or port were not mentioned", c.ChallDir, c.Type)
+		}
+
+		if c.Type == "dynamic" && c.DepType != "http" && c.DepPort == 0 {
+			return fmt.Errorf("%s: plesae mention port when the dynamic challenge is not http", c.ChallDir)
 		}
 
 		if c.DepType != "http" && c.DepType != "nc" && c.DepType != "ssh" {
 			return fmt.Errorf("%s: deployment type can be one of ('http', 'ssh' or 'nc')", c.ChallDir)
 		}
+	} else {
+		c.DepPort = 443
+		c.DepType = "http"
 	}
 
 	return nil

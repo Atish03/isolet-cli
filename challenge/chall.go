@@ -100,8 +100,8 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 
 	challQuery := fmt.Sprintf(`
 	INSERT INTO challenges
-	(chall_name, category_id, type, prompt, points, files, flag, author, visible, tags, links)
-	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', '%s', %s, '%s', '%s')
+	(chall_name, category_id, type, prompt, points, files, flag, author, visible, tags, links, subd, port, deployment, attempts)
+	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', '%s', %s, '%s', '%s', '%s', %d, '%s', %d)
 	ON CONFLICT (chall_name)
 	DO UPDATE SET
 		category_id = EXCLUDED.category_id,
@@ -125,6 +125,10 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 		vis,
 		string(tagsJSON),
 		string(linksJSON),
+		ConvertToSubdomain(c.ChallName),
+		c.DepPort,
+		c.DepType,
+		c.Attempts,
 	)
 
 	hintQuery := `INSERT INTO hints (chall_id, hint, cost, visible) VALUES `
