@@ -36,6 +36,7 @@ category_name: "Web"
 prompt: "Find the vulnerability in the login system to retrieve the flag."
 points: 200
 flag: "CTF{dynamic_sql_injection_flag}"
+attempts (optional): 20 
 hints (optional):
   - hint: "Start by trying simple ' OR '1'='1' payloads"
     visible: false
@@ -53,10 +54,10 @@ files (optional):
 
 # Only for dynamic challenges
 
-deployment_type: http
-deployment_port: 80
-cpu (optional): 15
-mem (optional): 32
+deployment_type: ssh
+deployment_port: 2345 # Not required if deployment type is http or challenge type is on-demand
+cpu (optional): 15m
+mem (optional): 32Mi
 ```
 
 ## Deployment
@@ -64,12 +65,12 @@ The `deploy` command is used to deploy dynamic challenge and expose it using a l
 Similarly one can take down a deployment using `undeploy` command
 
 > [!IMPORTANT]
-> Try to work on a challenge on a single device, since syncing might cause issues, make sure that the cli tool is not used to edit challenges after the event is started, all the challenges must be managed using admin panel (except deploying dynamic challenges) since mismatch of challenge metadata may cause issues 
+> Try to work on a challenge on a single device, since syncing might cause issues, make sure that the cli tool is not used to edit challenges after the event is started, all the challenges must be managed using admin panel.
 
 ## Custom deployment
-Typically a dynamic challenge must use a single docker container which will be run and specified port will be exposed, but there might be a case where author wants to use multiple containers.
+Typically a dynamic/on-demand challenge must use a single docker container which will be run and specified port will be exposed, but there might be a case where author wants to use multiple containers.
 
-One can use `deployment.yaml` to define their deployment and run `chall deploy`
+One can use `deployment.yaml` to define their deployment and run `chall load`
 
 Following is a template for `deployment.yaml`:
 ```yaml
@@ -79,19 +80,27 @@ kind: Deployment
 metadata:
   name: {{.Subd}}
   namespace: dynamic
+  labels:
+    app.kubernetes.io/component: deployment
+    app.kubernetes.io/name: {{.Subd}}
+    app.kubernetes.io/part-of: challenges
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{.Subd}}
+      app.kubernetes.io/component: deployment
+      app.kubernetes.io/name: {{.Subd}}
+      app.kubernetes.io/part-of: challenges
   template:
     metadata:
       labels:
-        app: {{.Subd}}
+        app.kubernetes.io/component: deployment
+        app.kubernetes.io/name: {{.Subd}}
+        app.kubernetes.io/part-of: challenges
     spec:
       containers:
       - image: {{.Registry}}/<image-dir-name> # put the name of directory your required image's Dockerfile is in
-        name: {{.Subd}}
+        name: container-1
         ports:
         - containerPort: 80 # 22 for ssh, 6969 for nc
         resources:
@@ -111,13 +120,17 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: {{.Subd}}
   name: {{.Subd}}-svc
   namespace: dynamic
+  labels:
+    app.kubernetes.io/component: service
+    app.kubernetes.io/name: {{.Subd}}
+    app.kubernetes.io/part-of: challenges
 spec:
   ports:
   - port: 8008
     protocol: TCP
     targetPort: 80 # same as containerPort
   selector:
-    app: {{.Subd}}
+    app.kubernetes.io/name: {{.Subd}}
   type: ClusterIP
 ---
 apiVersion: traefik.io/v1alpha1
@@ -125,6 +138,10 @@ kind: IngressRoute
 metadata:
   name: {{.Subd}}-ingress
   namespace: dynamic
+  labels:
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/name: {{.Subd}}
+    app.kubernetes.io/part-of: challenges
 spec:
   entryPoints:
   - {{.Subd}} # only for nc/ssh challs
