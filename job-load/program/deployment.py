@@ -17,22 +17,23 @@ class Deployment:
         self.core_api = client.CoreV1Api()
         self.api = client.ApiClient()
     
-    def __get_deployment_yaml(self, subd: str, image: str, port: int, private: bool, resources: dict, secret: str) -> dict:
+    def __get_deployment_yaml(self, subd: str, image: str, port: int, private: bool, resources: dict, secret: str, namespace: str) -> dict:
         try:
             deployment = client.V1Deployment(
                 api_version="apps/v1",
                 kind="Deployment",
                 metadata=client.V1ObjectMeta(
                     name=subd,
-                    namespace="dynamic"
+                    namespace=namespace,
+                    labels={"app.kubernetes.io/component": "deployment", "app.kubernetes.io/name": subd, "app.kubernetes.io/part-of": "challenges"}
                 ),
                 spec=client.V1DeploymentSpec(
                     replicas=1,
                     selector=client.V1LabelSelector(
-                        match_labels={"app": subd}
+                        match_labels={"app.kubernetes.io/component": "deployment", "app.kubernetes.io/name": subd, "app.kubernetes.io/part-of": "challenges"}
                     ),
                     template=client.V1PodTemplateSpec(
-                        metadata=client.V1ObjectMeta(labels={"app": subd}),
+                        metadata=client.V1ObjectMeta(labels={"app.kubernetes.io/component": "deployment", "app.kubernetes.io/name": subd, "app.kubernetes.io/part-of": "challenges"}),
                         spec=client.V1PodSpec(
                             containers=[
                                 client.V1Container(
@@ -65,20 +66,25 @@ class Deployment:
             print(e)
             exit(1)
             
-    def __get_svc_yaml(self, subd: str, port: int) -> dict:
+    def __get_svc_yaml(self, subd: str, port: int, namespace: str) -> dict:
         try:
             service = client.V1Service(
                 api_version="v1",
                 kind="Service",
                 metadata=client.V1ObjectMeta(
                     name=f"{subd}-svc",
-                    namespace="dynamic",
+                    namespace=namespace,
                     annotations={
                         "traefik.ingress.kubernetes.io/router.entrypoints": subd
+                    },
+                    labels={
+                        "app.kubernetes.io/component": "service",
+                        "app.kubernetes.io/part-of": "challenges",
+                        "app.kubernetes.io/name": subd
                     }
                 ),
                 spec=client.V1ServiceSpec(
-                    selector={"app": subd},
+                    selector={"app.kubernetes.io/name": subd},
                     ports=[
                         client.V1ServicePort(
                             protocol="TCP",
@@ -96,7 +102,7 @@ class Deployment:
             print(e)
             exit(1)
             
-    def __get_ingress_yaml(self, subd: str, host: str, dep_type: str) -> dict:
+    def __get_ingress_yaml(self, subd: str, host: str, dep_type: str, namespace: str) -> dict:
         try:
             entrypoints = [subd]
             ingress_type = "IngressRouteTCP"
@@ -110,7 +116,12 @@ class Deployment:
                 "kind": ingress_type,
                 "metadata": {
                     "name": f"{subd}-ingress",
-                    "namespace": "dynamic"
+                    "namespace": namespace,
+                    "labels": {
+                        "app.kubernetes.io/component": "ingress",
+                        "app.kubernetes.io/part-of": "challenges",
+                        "app.kubernetes.io/name": subd
+                    }
                 },
                 "spec": {
                     "entryPoints": entrypoints,
@@ -140,6 +151,10 @@ class Deployment:
             
     def create(self, image: list):
         chall_type = os.environ.get("CHALL_TYPE")
+        namespace = "isolet"
+        
+        if chall_type == "dynamic":
+            namespace = "dynamic"
         
         if chall_type != "static":
             deployment_config = self.config["deployment_config"]
@@ -155,16 +170,16 @@ class Deployment:
                 if port == 80:
                     host = f"Host(`{deployment_config['subd']}.ctf.{self.public_url}`)"
                 
-                dep = self.__get_deployment_yaml(deployment_config["subd"], image[0], port, deployment_config["registry"]["private"], deployment_config["resources"], deployment_config["registry"]["secret"])
-                svc = self.__get_svc_yaml(deployment_config["subd"], port)
-                ing = self.__get_ingress_yaml(deployment_config["subd"], host, deployment_config["type"])
+                dep = self.__get_deployment_yaml(deployment_config["subd"], image[0], port, deployment_config["registry"]["private"], deployment_config["resources"], deployment_config["registry"]["secret"], namespace)
+                svc = self.__get_svc_yaml(deployment_config["subd"], port, namespace)
+                ing = self.__get_ingress_yaml(deployment_config["subd"], host, deployment_config["type"], namespace)
                 
                 deployment_yaml = yaml.safe_dump_all([dep, svc, ing])
                 
                 body = client.V1ConfigMap(
                     api_version="v1",
                     kind="ConfigMap",
-                    metadata=client.V1ObjectMeta(name=f"{deployment_config['subd']}-cm", namespace="store"),
+                    metadata=client.V1ObjectMeta(name=f"{deployment_config['subd']}-cm", namespace="store", labels={"app.kubernetes.io/component": "config", "app.kubernetes.io/part-of": "challenges"}),
                     data={
                         "deployment.yaml": deployment_yaml
                     }

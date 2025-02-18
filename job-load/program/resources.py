@@ -19,17 +19,17 @@ class Resources:
         URL = "http://fileserver-svc.platform.svc.cluster.local/admin/upload"
         TOKEN = jwt.encode(self.data, self.secret, algorithm="HS256")
         
-        headers = {
-            "Authorization": f"Bearer {TOKEN}",
+        cookies = {
+            "token": TOKEN,
         }
         
         files = {
             "file": open(file_path, 'rb')
         }
         
-        res = requests.post(URL, headers=headers, files=files)
+        res = requests.post(URL, cookies=cookies, files=files)
         
-        if res.status_code == 200:
+        if res.status_code >= 200 or res.status_code <= 300:
             return os.path.join("https://", self.public_url, res.text.strip("/"))
         else:
             print("Not uploaded:", res.content.decode())

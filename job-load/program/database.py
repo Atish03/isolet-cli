@@ -90,6 +90,17 @@ class Database():
         hids = self.__insert_hints(chall_id)
         
         return chall_id
+    
+    def __get_prev_files(self, chall_id) -> list:
+        query = """
+        SELECT files FROM challenges
+        WHERE chall_id = %s
+        """
+        
+        self.cursor.execute(query, (chall_id,))
+        row = self.cursor.fetchone()
+        
+        return row[0]
         
     def update_links(self, chall_id: int, links: list) -> None:
         query = """
@@ -98,7 +109,14 @@ class Database():
         WHERE chall_id = %s
         """
         
-        self.cursor.execute(query, (links, chall_id))
+        prev_files = self.__get_prev_files(chall_id)
+        prev_files += links
+        
+        set_files = set(prev_files)
+        
+        print(set_files)
+        
+        self.cursor.execute(query, (list(set_files), chall_id))
         
     def commit(self):
         self.conn.commit()
