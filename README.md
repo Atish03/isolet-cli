@@ -20,7 +20,7 @@
 ```
 
 > [!NOTE]
-> The `chall ls` command will help you list challenges in a particular directory. The directory can be the challenge directory or the parent directory of the challenge directories, (DIRECTORY NAMES MUST FOLLOW RFC 1123).
+> The `chall ls` command will help you list challenges in a particular directory. The directory can be the challenge directory or the parent directory of the challenge directories, (DIRECTORY NAMES MUST FOLLOW RFC 1123 i.e directory names must contain letters (a-z), digits (0-9), and hyphens (-)).
 
 > [!CAUTION]
 > When defining `Dockerfile` for dynamic challenges make sure to use port `80 for http challenges`, `22 for ssh challenges` and `6969 for nc challenges`.
