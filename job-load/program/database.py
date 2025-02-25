@@ -114,8 +114,6 @@ class Database():
         
         set_files = set(prev_files)
         
-        print(set_files)
-        
         self.cursor.execute(query, (list(set_files), chall_id))
         
     def commit(self):

@@ -134,6 +134,10 @@ func (c *Challenge) validate() error {
 			return fmt.Errorf("%s: plesae mention port when the dynamic challenge is not http", c.ChallDir)
 		}
 
+		if c.Type == "on-demand" {
+			c.DepPort = 443
+		}
+
 		if c.DepType != "http" && c.DepType != "nc" && c.DepType != "ssh" {
 			return fmt.Errorf("%s: deployment type can be one of ('http', 'ssh' or 'nc')", c.ChallDir)
 		}

@@ -76,7 +76,6 @@ func GetChalls(path string, noCache bool, cli *client.CustomClient) []Challenge 
 }
 
 func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
-	filesJSON := formatArray(c.Files)
 	tagsJSON := formatArray(c.Tags)
 	linksJSON := formatArray(c.Links)
 	var vis string
@@ -100,15 +99,14 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 
 	challQuery := fmt.Sprintf(`
 	INSERT INTO challenges
-	(chall_name, category_id, type, prompt, points, files, flag, author, visible, tags, links, subd, port, deployment, attempts)
-	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', '%s', %s, '%s', '%s', '%s', %d, '%s', %d)
+	(chall_name, category_id, type, prompt, points, flag, author, visible, tags, links, subd, port, deployment, attempts)
+	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', %s, '%s', '%s', '%s', %d, '%s', %d)
 	ON CONFLICT (chall_name)
 	DO UPDATE SET
 		category_id = EXCLUDED.category_id,
 		type = EXCLUDED.type,
 		prompt = EXCLUDED.prompt,
 		points = EXCLUDED.points,
-		files = EXCLUDED.files,
 		author = EXCLUDED.author,
 		visible = EXCLUDED.visible,
 		tags = EXCLUDED.tags,
@@ -119,7 +117,6 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 		c.Type,
 		c.Prompt,
 		c.Points,
-		string(filesJSON),
 		c.Flag,
 		c.Author,
 		vis,
