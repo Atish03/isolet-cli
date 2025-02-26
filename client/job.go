@@ -169,6 +169,18 @@ func (deployjob *DeployJob) StartJob() (*batchv1.Job, error) {
 	return job, nil
 }
 
+func (challJob *ChallJob) DeleteExisting() {
+	deletePolicy := metav1.DeletePropagationForeground
+	deleteOptions := metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	}
+
+	err := challJob.ClientSet.BatchV1().Jobs(challJob.Namespace).Delete(context.Background(), challJob.JobName, deleteOptions)
+	if err == nil {
+		logger.LogMessage("INFO", "Job deleted successfully", challJob.JobName)
+	}
+}
+
 func (clientset *CustomClient) DeleteJobAndCM(namespace, jobName, configMapName string) (bool, error) {
 	deletePolicy := metav1.DeletePropagationForeground
 	deleteOptions := metav1.DeleteOptions{
