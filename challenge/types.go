@@ -58,16 +58,16 @@ type Hint struct {
 }
 
 type ExportStruct struct {
-	CategoryQuery string    `json:"category_query"`
-	ChallQuery    string    `json:"chall_query"`
-	HintsQuery    string    `json:"hints_query"`
-	DepConfig     DepConfig `json:"deployment_config"`
-	HintsChanged  bool      `json:"hints_changed"`
-	ChallChanged  bool      `json:"chall_changed"`
-	DockerChanged []string  `json:"docker_changed"`
-	ResChanged    []string  `json:"res_changed"`
-	OldName       string    `json:"old_name"`
-	NewName       string    `json:"new_name"`
+	CategoryValues []string   `json:"category_values"`
+	ChallValues    []string   `json:"chall_values"`
+	HintsValues    [][]string `json:"hints_values"`
+	DepConfig      DepConfig  `json:"deployment_config"`
+	HintsChanged   bool       `json:"hints_changed"`
+	ChallChanged   bool       `json:"chall_changed"`
+	DockerChanged  []string   `json:"docker_changed"`
+	ResChanged     []string   `json:"res_changed"`
+	OldName        string     `json:"old_name"`
+	NewName        string     `json:"new_name"`
 }
 
 type DepConfig struct {

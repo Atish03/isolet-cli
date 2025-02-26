@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"strconv"
 
 	"github.com/Atish03/isolet-cli/client"
 	"github.com/Atish03/isolet-cli/logger"
@@ -87,49 +87,25 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 		vis = "FALSE"
 	}
 
-	categoryQuery := fmt.Sprintf(`
-	INSERT INTO categories
-	(category_name)
-	VALUES ('%s')
-	ON CONFLICT (category_name)
-	DO UPDATE SET
-		category_name = EXCLUDED.category_name
-	RETURNING category_id
-	`, c.CategoryName)
+	categoryValues := []string{c.CategoryName}
 
-	challQuery := fmt.Sprintf(`
-	INSERT INTO challenges
-	(chall_name, category_id, type, prompt, points, flag, author, visible, tags, links, subd, port, deployment, attempts)
-	VALUES ('%s', $CATEGORY_ID, '%s', '%s', %d, '%s', '%s', %s, '%s', '%s', '%s', %d, '%s', %d)
-	ON CONFLICT (chall_name)
-	DO UPDATE SET
-		category_id = EXCLUDED.category_id,
-		type = EXCLUDED.type,
-		prompt = EXCLUDED.prompt,
-		points = EXCLUDED.points,
-		author = EXCLUDED.author,
-		visible = EXCLUDED.visible,
-		tags = EXCLUDED.tags,
-		links = EXCLUDED.links
-	RETURNING chall_id
-	`,
+	challValues := []string {
 		c.ChallName,
 		c.Type,
 		c.Prompt,
-		c.Points,
+		strconv.Itoa(c.Points),
 		c.Flag,
 		c.Author,
 		vis,
 		string(tagsJSON),
 		string(linksJSON),
 		ConvertToSubdomain(c.ChallName),
-		c.DepPort,
+		strconv.Itoa(c.DepPort),
 		c.DepType,
-		c.Attempts,
-	)
+		strconv.Itoa(c.Attempts),
+	}
 
-	hintQuery := `INSERT INTO hints (chall_id, hint, cost, visible) VALUES `
-	values := make([]string, len(c.Hints))
+	hintValues := make([][]string, len(c.Hints))
 	for i, hint := range c.Hints {
 		switch hint.Visible {
 		case true:
@@ -137,16 +113,12 @@ func (c *Challenge) GetExportStruct() (exp ExportStruct, err error) {
 		case false:
 			vis = "FALSE"
 		}
-		escapedHint := strings.ReplaceAll(hint.Hint, "'", `''`)
-		values[i] = fmt.Sprintf("($CHALL_ID, '%s', %d, %s)", escapedHint, hint.Cost, vis)
+		hintValues[i] = []string{hint.Hint, strconv.Itoa(hint.Cost), vis}
 	}
 
-	hintQuery += strings.Join(values, ", ")
-	hintQuery += " RETURNING hid"
-
-	exp.CategoryQuery = categoryQuery
-	exp.ChallQuery = challQuery
-	exp.HintsQuery = hintQuery
+	exp.CategoryValues = categoryValues
+	exp.ChallValues = challValues
+	exp.HintsValues = hintValues
 
 	exp.updateChanges(c)
 	exp.populateResources(c)
