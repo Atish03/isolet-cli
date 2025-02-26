@@ -79,7 +79,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{.Subd}}
-  namespace: dynamic
+  namespace: {{.Namespace}}
   labels:
     app.kubernetes.io/component: deployment
     app.kubernetes.io/name: {{.Subd}}
@@ -119,7 +119,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: {{.Subd}}
   name: {{.Subd}}-svc
-  namespace: dynamic
+  namespace: {{.Namespace}}
   labels:
     app.kubernetes.io/component: service
     app.kubernetes.io/name: {{.Subd}}
@@ -137,7 +137,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: {{.Subd}}-ingress
-  namespace: dynamic
+  namespace: {{.Namespace}}
   labels:
     app.kubernetes.io/component: ingress
     app.kubernetes.io/name: {{.Subd}}

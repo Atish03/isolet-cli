@@ -93,8 +93,15 @@ func (chall *Challenge) handleCustomChall() error {
 			return fmt.Errorf("cannot read deloyment.yaml file: %v", err)
 		}
 
+		namespace := "isolet"
+
+		if chall.Type == "dynamic" {
+			namespace = "dynamic"
+		}
+
 		finalyamlStr := strings.ReplaceAll(string(yamlStr), "{{.Subd}}", ConvertToSubdomain(chall.ChallName))
 		finalyamlStr = strings.ReplaceAll(finalyamlStr, "{{.Registry}}", filepath.Clean(chall.Registry.URL))
+		finalyamlStr = strings.ReplaceAll(finalyamlStr, "{{.Namespace}}", namespace)
 
 		chall.CustomDeploy.Deployment = finalyamlStr
 	}
