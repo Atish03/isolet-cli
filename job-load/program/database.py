@@ -1,4 +1,5 @@
 import psycopg2, json
+import psycopg2.extras
 from string import Template
 import kubernetes_client
 
@@ -16,13 +17,25 @@ class Database():
             exit(1)
         
         self.conn = psycopg2.connect(**db_config)
-        self.cursor = self.conn.cursor()
+        self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     def __insert_category(self) -> int:
-        self.cursor.execute(self.config.get('category_query'))
-        rows = self.cursor.fetchall()
+        catergory_values = tuple(self.config.get('category_values'))
         
-        return rows[0][0]
+        query = """
+        INSERT INTO categories
+        (category_name)
+        VALUES (%s)
+        ON CONFLICT (category_name)
+        DO UPDATE SET
+            category_name = EXCLUDED.category_name
+        RETURNING category_id
+        """
+        
+        self.cursor.execute(query, catergory_values)
+        row = self.cursor.fetchone()
+        
+        return row["category_id"]
     
     def __change_chall_name(self) -> None:
         query = """
@@ -38,23 +51,54 @@ class Database():
             self.commit()
     
     def __insert_chall(self, category_id: int) -> int:
-        challenge_query = Template(self.config.get('chall_query')).substitute({'CATEGORY_ID': category_id})
-    
-        self.cursor.execute(challenge_query)
-        rows = self.cursor.fetchall()
+        challenge_values = tuple(self.config.get('chall_values'))
         
-        return rows[0][0]
+        query = f"""
+        INSERT INTO challenges
+        (chall_name, category_id, type, prompt, points, flag, author, visible, tags, links, subd, port, deployment, attempts)
+        VALUES (%s, {category_id}, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (chall_name)
+        DO UPDATE SET
+            category_id = EXCLUDED.category_id,
+            type = EXCLUDED.type,
+            prompt = EXCLUDED.prompt,
+            points = EXCLUDED.points,
+            flag = EXCLUDED.flag,
+            author = EXCLUDED.author,
+            visible = EXCLUDED.visible,
+            tags = EXCLUDED.tags,
+            links = EXCLUDED.links,
+            subd = EXCLUDED.subd,
+            port = EXCLUDED.port,
+            deployment = EXCLUDED.deployment,
+            attempts = EXCLUDED.attempts
+        RETURNING chall_id
+        """
+    
+        self.cursor.execute(query, challenge_values)
+        row = self.cursor.fetchone()
+        
+        return row["chall_id"]
     
     def __insert_hints(self, chall_id: int) -> list:
         if self.config.get("hints_changed"):
             self.__delete_hints(chall_id)
             
-            hints_query = Template(self.config.get('hints_query')).substitute({'CHALL_ID': chall_id})
-        
-            self.cursor.execute(hints_query)
-            rows = self.cursor.fetchall()
+            hint_values = self.config.get("hints_values")
             
-            hids = list(map(lambda x: x[0], rows))
+            hints_query = f"""
+            INSERT INTO hints
+            (chall_id, hint, cost, visible)
+            VALUES ({chall_id}, %s, %s, %s)
+            RETURNING hid
+            """
+
+            hids = []
+            
+            for hint in hint_values:
+                self.cursor.execute(hints_query, tuple(hint))
+                row = self.cursor.fetchone()
+                hids.append(row["hid"])
         
             self.__update_hints_in_chall(chall_id, hids)
     
@@ -74,9 +118,9 @@ class Database():
         """
         
         self.cursor.execute(query, (chall_id,))
-        rows = self.cursor.fetchall()
+        row = self.cursor.fetchone()
         
-        hint_ids = rows[0][0]
+        hint_ids = row["hints"]
         
         for hid in hint_ids:
             delete_query = f"DELETE FROM hints WHERE hid = {hid}"
@@ -100,7 +144,7 @@ class Database():
         self.cursor.execute(query, (chall_id,))
         row = self.cursor.fetchone()
         
-        return row[0]
+        return row["files"]
         
     def update_links(self, chall_id: int, links: list) -> None:
         query = """
