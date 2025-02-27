@@ -36,20 +36,20 @@ category_name: "Web"
 prompt: "Find the vulnerability in the login system to retrieve the flag."
 points: 200
 flag: "CTF{dynamic_sql_injection_flag}"
-attempts (optional): 20 
-hints (optional):
+attempts: 20 # optional
+hints: # optional
   - hint: "Start by trying simple ' OR '1'='1' payloads"
     visible: false
   - hint: "Use tools like sqlmap if stuck"
     cost: 300
 author: "Bob"
-visible (optional): false
+visible: false # optional
 tags:
   - "Web"
   - "Beginner"
-links (optional):
+links: # optional
   - "https://wiki.com/sql_injection"
-files (optional):
+files: # optional
   - "file.txt" # Must match the file name in resources directory
 
 # Only for dynamic challenges
