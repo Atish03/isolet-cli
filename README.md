@@ -56,8 +56,8 @@ files: # optional
 
 deployment_type: ssh
 deployment_port: 2345 # Not required if deployment type is http or challenge type is on-demand
-cpu (optional): 15m
-mem (optional): 32Mi
+cpu: 15m # optional
+mem: 32Mi # optional
 ```
 
 ## Deployment
