@@ -154,7 +154,7 @@ func updateCM(subd string) error {
 func restartDeployment() error {
 	deployment, err := kubecli.AppsV1().Deployments(TRAEFIK_NS).Get(context.Background(), TRAEFIK_DEP, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Error fetching deployment: %v", err)
+		return fmt.Errorf("error fetching deployment: %v", err)
 	}
 
 	if deployment.Spec.Template.ObjectMeta.Annotations == nil {
@@ -164,7 +164,7 @@ func restartDeployment() error {
 
 	_, err = kubecli.AppsV1().Deployments(TRAEFIK_NS).Update(context.Background(), deployment, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("Error updating deployment: %v", err)
+		return fmt.Errorf("error updating deployment: %v", err)
 	}
 
 	return nil
@@ -253,12 +253,14 @@ func drawChallTable(challs []challenge.Challenge) {
 
 func loadChalls(challs []challenge.Challenge) {
 	var wg sync.WaitGroup
+
+	allJobs := []challenge.JobStatus{}
 	
 	for _, chall := range(challs) {
 		wg.Add(1)
 		
 		go func(){
-			err := chall.Load(&kubecli, "automation", &wg)
+			err := chall.Load(&kubecli, "automation", &wg, &allJobs)
 			if err != nil {
 				logger.LogMessage("ERROR", fmt.Sprintf("error loading challenge: %v", err), "Main")
 			}
@@ -266,6 +268,16 @@ func loadChalls(challs []challenge.Challenge) {
 	}
 
 	wg.Wait()
+
+	fmt.Printf("\n")
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Name", "Status"})
+
+	for _, jobs := range(allJobs) {
+		table.Append([]string{jobs.JobName, jobs.Status})
+	}
+	table.Render()
 }
 
 func configCLI(registry string) error {

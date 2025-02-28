@@ -8,9 +8,10 @@ import (
 
 	"github.com/Atish03/isolet-cli/client"
 	"github.com/Atish03/isolet-cli/logger"
+	"github.com/fatih/color"
 )
 
-func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *sync.WaitGroup) error {
+func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *sync.WaitGroup, allJobs *[]JobStatus) error {
 	job_name := filepath.Base(filepath.Clean(chall.ChallDir))
 
 	adminSecret, err := cli.GetAdminSecret()
@@ -76,6 +77,9 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 		}
 		if success {
 			chall.SaveCache()
+			*allJobs = append(*allJobs, JobStatus{JobName: jobDesc.Name, Status: color.GreenString("Succeeded")})
+		} else {
+			*allJobs = append(*allJobs, JobStatus{JobName: jobDesc.Name, Status: color.RedString("Failed")})
 		}
 
 		wg.Done()

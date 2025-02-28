@@ -85,3 +85,8 @@ type Resources struct {
 	MemLimit string `json:"mem_limit"`
 	MemReq   string `json:"mem_req"`
 }
+
+type JobStatus struct {
+	JobName string `json:"job_name"`
+	Status  string `json:"status"`
+}
