@@ -191,17 +191,17 @@ func (exp *ExportStruct) updateChanges(chall *Challenge) {
 }
 
 func (exp *ExportStruct) populateResources(chall *Challenge) {
-	exp.DepConfig.Resources.CPULimit = "300m"
-	exp.DepConfig.Resources.MemLimit = "256Mi"
+	exp.DepConfig.Resources.CPULimit = "30m"
+	exp.DepConfig.Resources.MemLimit = "128Mi"
 
 	exp.DepConfig.Resources.CPUReq = chall.CPU
 	exp.DepConfig.Resources.MemReq = chall.Memory
 
 	if exp.DepConfig.Resources.CPUReq == "" {
-		exp.DepConfig.Resources.CPUReq = "100m"
+		exp.DepConfig.Resources.CPUReq = "10m"
 	}
 
 	if exp.DepConfig.Resources.MemReq == "" {
-		exp.DepConfig.Resources.MemReq = "64Mi"
+		exp.DepConfig.Resources.MemReq = "32Mi"
 	}
 }
