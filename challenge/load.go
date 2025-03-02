@@ -55,7 +55,7 @@ func (chall *Challenge) Load(cli *client.CustomClient, namespace string, wg *syn
 	}
 
 	if chall.CustomDeploy.Custom {
-		_, err := cli.CreateConfigMap(fmt.Sprintf("%s-cm", job_name), "store", chall.CustomDeploy.Deployment, "deployment.yaml")
+		_, err := cli.CreateConfigMap(fmt.Sprintf("%s-cm", ConvertToSubdomain(chall.ChallName)), "store", chall.CustomDeploy.Deployment, "deployment.yaml")
 		if err != nil {
 			return fmt.Errorf("cannot create deployment config map for custom deployment %s: %v", chall.ChallDir, err)
 		}
