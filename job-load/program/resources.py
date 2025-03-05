@@ -38,17 +38,20 @@ class Resources:
     def upload(self) -> list:
         public_urls = []
         
-        config = None
+        # config = None
             
-        with open("/config/config.json", "r") as f:
-            config = json.loads(f.read())
+        # with open("/config/config.json", "r") as f:
+        #     config = json.loads(f.read())
             
-        files = config.get("res_changed")
+        # files = config.get("res_changed")
         
-        for f in files:
-            file_path = os.path.join("/chall/resources/", f)
-            upload_path = self.__upload(file_path)
-            if upload_path:
-                public_urls.append(upload_path)
+        if os.path.exists("/chall/resources/"):
+            files = os.listdir("/chall/resources/")
+            
+            for f in files:
+                file_path = os.path.join("/chall/resources/", f)
+                upload_path = self.__upload(file_path)
+                if upload_path:
+                    public_urls.append(upload_path)
         
         return public_urls

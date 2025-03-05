@@ -141,6 +141,10 @@ func (c *Challenge) validate() error {
 		if c.DepType != "http" && c.DepType != "nc" && c.DepType != "ssh" {
 			return fmt.Errorf("%s: deployment type can be one of ('http', 'ssh' or 'nc')", c.ChallDir)
 		}
+
+		if c.DepType == "http" {
+			c.DepPort = 443
+		}
 	} else {
 		c.DepPort = 443
 		c.DepType = "http"

@@ -207,7 +207,7 @@ func deleteChalls(challs []challenge.Challenge) {
 				logger.LogMessage("ERROR", fmt.Sprintf("Failed to delete ingressroutetcp: %v", err), "Main")
 			}
 
-			if chall.DepPort != 80 {
+			if chall.DepPort >= 30000 {
 				ports = append(ports, int32(chall.DepPort))
 			}
 

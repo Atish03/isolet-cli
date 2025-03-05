@@ -81,9 +81,7 @@ type DepConfig struct {
 
 type Resources struct {
 	CPULimit string `json:"cpu_limit"`
-	CPUReq   string `json:"cpu_req"`
 	MemLimit string `json:"mem_limit"`
-	MemReq   string `json:"mem_req"`
 }
 
 type JobStatus struct {

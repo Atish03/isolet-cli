@@ -153,12 +153,12 @@ class Database():
         WHERE chall_id = %s
         """
         
-        prev_files = self.__get_prev_files(chall_id)
-        prev_files += links
+        # prev_files = self.__get_prev_files(chall_id)
+        # prev_files += links
         
-        set_files = set(prev_files)
+        # set_files = set(prev_files)
         
-        self.cursor.execute(query, (list(set_files), chall_id))
+        self.cursor.execute(query, (links, chall_id))
         
     def commit(self):
         self.conn.commit()

@@ -44,10 +44,6 @@ class Deployment:
                                             "cpu": resources["cpu_limit"],
                                             "memory": resources["mem_limit"],
                                         },
-                                        requests={
-                                            "cpu": resources["cpu_req"],
-                                            "memory": resources["mem_req"],
-                                        }
                                     ),
                                     ports=[client.V1ContainerPort(container_port=port)]
                                 )
